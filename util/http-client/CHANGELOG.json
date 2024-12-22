@@ -1,0 +1,252 @@
+{
+  "name": "@subsquid/http-client",
+  "entries": [
+    {
+      "version": "1.6.0",
+      "tag": "@subsquid/http-client_v1.6.0",
+      "date": "Fri, 20 Dec 2024 16:52:59 GMT",
+      "comments": {
+        "minor": [
+          {
+            "comment": "add support for `retry-after` header"
+          }
+        ]
+      }
+    },
+    {
+      "version": "1.5.0",
+      "tag": "@subsquid/http-client_v1.5.0",
+      "date": "Wed, 07 Aug 2024 15:52:38 GMT",
+      "comments": {
+        "minor": [
+          {
+            "comment": "make 524 error retryable"
+          }
+        ]
+      }
+    },
+    {
+      "version": "1.4.0",
+      "tag": "@subsquid/http-client_v1.4.0",
+      "date": "Sun, 17 Mar 2024 23:20:20 GMT",
+      "comments": {
+        "minor": [
+          {
+            "comment": "expose `FetchResponse` type"
+          }
+        ],
+        "dependency": [
+          {
+            "comment": "Updating dependency \"@subsquid/util-internal\" from `^3.0.0` to `^3.1.0`"
+          }
+        ]
+      }
+    },
+    {
+      "version": "1.3.2",
+      "tag": "@subsquid/http-client_v1.3.2",
+      "date": "Fri, 01 Dec 2023 16:55:51 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "update dependencies"
+          },
+          {
+            "comment": "update dependencies"
+          }
+        ],
+        "dependency": [
+          {
+            "comment": "Updating dependency \"@subsquid/logger\" from `^1.3.1` to `^1.3.2`"
+          },
+          {
+            "comment": "Updating dependency \"@subsquid/util-internal\" from `^2.5.2` to `^3.0.0`"
+          }
+        ]
+      }
+    },
+    {
+      "version": "1.3.1",
+      "tag": "@subsquid/http-client_v1.3.1",
+      "date": "Thu, 28 Sep 2023 20:58:19 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "update dependencies"
+          },
+          {
+            "comment": "compile with TypeScript 5"
+          }
+        ],
+        "dependency": [
+          {
+            "comment": "Updating dependency \"@subsquid/logger\" from `^1.3.0` to `^1.3.1`"
+          },
+          {
+            "comment": "Updating dependency \"@subsquid/util-internal\" from `^2.5.1` to `^2.5.2`"
+          }
+        ]
+      }
+    },
+    {
+      "version": "1.3.0",
+      "tag": "@subsquid/http-client_v1.3.0",
+      "date": "Tue, 12 Sep 2023 08:42:04 GMT",
+      "comments": {
+        "minor": [
+          {
+            "comment": "add response stream mode"
+          },
+          {
+            "comment": "expose `HttpBody` type"
+          }
+        ]
+      }
+    },
+    {
+      "version": "1.2.2",
+      "tag": "@subsquid/http-client_v1.2.2",
+      "date": "Thu, 07 Sep 2023 18:37:04 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "fix: `HttpClient.isRetryableError()` should handle `HttpError` instances"
+          }
+        ]
+      }
+    },
+    {
+      "version": "1.2.1",
+      "tag": "@subsquid/http-client_v1.2.1",
+      "date": "Tue, 05 Sep 2023 20:32:34 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "support basic auth urls"
+          }
+        ]
+      }
+    },
+    {
+      "version": "1.2.0",
+      "tag": "@subsquid/http-client_v1.2.0",
+      "date": "Sun, 11 Jun 2023 15:49:45 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "fix exception in `isHttpConnectionError()` when `node-fetch` ESM is not loaded"
+          },
+          {
+            "comment": "fix response headers logging"
+          }
+        ],
+        "minor": [
+          {
+            "comment": "downgrade `TypeScript` to `4.9.5`"
+          },
+          {
+            "comment": "use default logger when no logger is passed"
+          }
+        ],
+        "dependency": [
+          {
+            "comment": "Updating dependency \"@subsquid/logger\" from `^1.1.0` to `^1.2.0`"
+          },
+          {
+            "comment": "Updating dependency \"@subsquid/util-internal\" from `^2.2.0` to `^2.3.0`"
+          }
+        ]
+      }
+    },
+    {
+      "version": "1.1.0",
+      "tag": "@subsquid/http-client_v1.1.0",
+      "date": "Sat, 10 Jun 2023 15:11:08 GMT",
+      "comments": {
+        "minor": [
+          {
+            "comment": "migrate to TypeScript 5 and update other dependencies"
+          }
+        ],
+        "dependency": [
+          {
+            "comment": "Updating dependency \"@subsquid/logger\" from `^1.0.0` to `^1.1.0`"
+          },
+          {
+            "comment": "Updating dependency \"@subsquid/util-internal\" from `^2.1.0` to `^2.2.0`"
+          }
+        ]
+      }
+    },
+    {
+      "version": "1.0.0",
+      "tag": "@subsquid/http-client_v1.0.0",
+      "date": "Mon, 01 May 2023 18:57:46 GMT",
+      "comments": {
+        "major": [
+          {
+            "comment": "Introduce ArrowSquid"
+          }
+        ],
+        "dependency": [
+          {
+            "comment": "Updating dependency \"@subsquid/logger\" from `^0.3.1` to `^1.0.0`"
+          },
+          {
+            "comment": "Updating dependency \"@subsquid/util-internal\" from `^1.1.0` to `^2.0.0`"
+          }
+        ]
+      }
+    },
+    {
+      "version": "0.1.0",
+      "tag": "@subsquid/util-internal-http-client_v0.1.0",
+      "date": "Sat, 25 Feb 2023 19:16:49 GMT",
+      "comments": {
+        "minor": [
+          {
+            "comment": "export `AgentProvider` interface and `HttpAgent` class"
+          },
+          {
+            "comment": "use 20 second http request timeout by default"
+          }
+        ],
+        "patch": [
+          {
+            "comment": "fix backoff pause time"
+          },
+          {
+            "comment": "refine `isHttpConnectionError()`"
+          }
+        ]
+      }
+    },
+    {
+      "version": "0.0.1",
+      "tag": "@subsquid/util-internal-http-client_v0.0.1",
+      "date": "Sun, 12 Feb 2023 12:16:19 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "use `body.arrayBuffer()` instead of `body.buffer()` to fix deprecation warning (closes #161)"
+          }
+        ]
+      }
+    },
+    {
+      "version": "0.0.0",
+      "tag": "@subsquid/util-internal-http-client_v0.0.0",
+      "date": "Thu, 09 Feb 2023 15:10:00 GMT",
+      "comments": {
+        "dependency": [
+          {
+            "comment": "Updating dependency \"@subsquid/logger\" from `^0.3.0` to `^0.3.1`"
+          },
+          {
+            "comment": "Updating dependency \"@subsquid/util-internal\" from `^1.0.0` to `^1.1.0`"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,36 @@
+**/node_modules/
+
+# Build artifacts
+/*/*/lib/
+
+# Large files not needed in docker containers
+/test/data/chain
+/test/types/gen
+/test/borsh-bench/data
+
+# Rush temporary files
+/common/deploy/
+/common/temp/
+/common/autoinstallers/*/.npmrc
+**/.rush/temp/
+
+# Our temprorary files (e.g. ad-hoc scripts)
+**/*.temp.*
+**/*.temp
+
+# IDE and tools
+.git
+.idea
+**/*.log
+
+# READMEs and docs
+**/*.md
+
+# Ignore Dockerfile, so that we can work on it without full rebuild each time
+Dockerfile
+docker-compose.yml
+/ops/docker-publish.sh
+
+**/.DS_Store
+
+*.temp
