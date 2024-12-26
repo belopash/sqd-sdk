@@ -1,9 +1,12 @@
 import {HttpClient} from '@subsquid/http-client'
 import type {Logger} from '@subsquid/logger'
-import {AsyncQueue, ensureError, last, wait, withErrorContext} from '@subsquid/util-internal'
+import {AsyncQueue, last, Throttler, wait, withErrorContext} from '@subsquid/util-internal'
 import assert from 'assert'
-import {clear} from 'console'
-import {WritableStreamDefaultWriter} from 'stream/web'
+
+export interface HashAndHeight {
+    hash: string
+    height: number
+}
 
 export interface PortalQuery {
     fromBlock: number
@@ -12,8 +15,8 @@ export interface PortalQuery {
 
 export interface Block {
     header: {
-        number: number
         hash: string
+        number: number
     }
 }
 
@@ -35,9 +38,13 @@ export interface PortalRequestOptions {
 }
 
 export interface PortalStreamOptions extends PortalRequestOptions {
-    stopOnHead?: boolean
     newBlockTimeout?: number
     headPollInterval?: number
+}
+
+export interface PortalStreamData<B extends Block> {
+    finalizedHead: HashAndHeight
+    blocks: B[]
 }
 
 export class PortalClient {
@@ -100,8 +107,17 @@ export class PortalClient {
     getFinalizedStream<B extends Block = Block, Q extends PortalQuery = PortalQuery>(
         query: Q,
         options?: PortalStreamOptions
-    ): ReadableStream<B[]> {
+    ): ReadableStream<PortalStreamData<B>> {
         let buffer = new BlocksBuffer<B>(this.bufferThreshold)
+        let finalizedHead = new Throttler(async () => {
+            // we try to emulate behavior of stream header, but we are missing hash
+            // https://github.com/subsquid/squid-sdk/blob/7e993e21435aa24c27335beab510b8ce5a2d24b0/solana/solana-data-service/src/main.ts#L95
+            let height = await this.getFinalizedHeight()
+            return {
+                height,
+                hash: '',
+            }
+        }, 10_000)
         let abortStream = new AbortController()
         let abortSignal = options?.abort ? anySignal([options.abort, abortStream.signal]) : abortStream.signal
 
@@ -129,14 +145,13 @@ export class PortalClient {
                         )
 
                     if (response.status == 204) {
-                        if (options?.stopOnHead) break
                         await wait(options?.headPollInterval ?? 1000, abortSignal)
                         continue
                     }
 
                     let hearbeatInterval = Math.ceil(Math.min(this.newBlockTimeout) / 4)
                     heartbeat = new HeartBeat((diff) => {
-                        if (diff > this.newBlockTimeout) ac.abort()
+                        if (diff > this.newBlockTimeout) abortStream.abort()
                     }, hearbeatInterval)
 
                     await response.body
@@ -153,7 +168,7 @@ export class PortalClient {
                         .pipeThrough(new LineSplitStream('\n'))
                         .pipeTo(
                             new WritableStream({
-                                write: async (chunk) => {
+                                write: async (chunk, controller) => {
                                     let lastBlock = await buffer.put(chunk)
                                     startBlock = lastBlock + 1
                                 },
@@ -189,7 +204,10 @@ export class PortalClient {
             pull: async (controller) => {
                 let value = await buffer.take()
                 if (value) {
-                    controller.enqueue(value)
+                    controller.enqueue({
+                        finalizedHead: await finalizedHead.get(),
+                        blocks: value,
+                    })
                 } else {
                     controller.close()
                 }

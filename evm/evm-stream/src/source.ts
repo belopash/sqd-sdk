@@ -100,27 +100,6 @@ export class EvmPortalDataSource<Fields extends FieldSelection, Block extends Bl
         const ingest = async () => {
             let query = applyRangeBound(this.query, range)
 
-            let top = new Throttler(async () => {
-                let height = await this.portal.getFinalizedHeight()
-                let block = await this.portal.getFinalizedQuery({
-                    type: 'evm',
-                    fromBlock: height,
-                    toBlock: height,
-                    includeAllBlocks: true,
-                    fields: {
-                        block: {
-                            number: true,
-                            hash: true,
-                        },
-                    },
-                })
-                return {
-                    height: block[0].header.number,
-                    hash: block[0].header.hash,
-                }
-            }, 10_000)
-            let finalizedHead = await top.get()
-
             for (let queryRange of query) {
                 let request = {
                     type: 'evm',
@@ -130,23 +109,15 @@ export class EvmPortalDataSource<Fields extends FieldSelection, Block extends Bl
                     ...queryRange.request,
                 }
 
-                let finaliz
+                for await (let data of this.portal.getFinalizedStream(request, {abort: ac.signal})) {
+                    let blocks = data.blocks.map((b) => mapBlock(b, this.fields) as unknown as Block)
 
-                await this.portal.getFinalizedStream(request, {abort: ac.signal}).pipeTo(
-                    new WritableStream({
-                        write: async (batch) => {
-                            let blocks = batch.map((b) => mapBlock(b, this.fields) as unknown as Block)
-
-                            await queue.put({
-                                finalizedHead,
-                                blocks,
-                                rolledbackHeads: [],
-                            })
-
-                            finalizedHead = await top.get()
-                        },
+                    await queue.put({
+                        finalizedHead: data.finalizedHead,
+                        blocks,
+                        rolledbackHeads: [],
                     })
-                )
+                }
             }
         }
 
