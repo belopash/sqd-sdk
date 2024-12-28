@@ -17,6 +17,31 @@ export function addTimeout<T>(
 }
 
 
+export function addStreamTimeout<T>(stream: ReadableStream<T>, ms: number, onTimeout?: () => Error | undefined | void): ReadableStream<T> {
+    if (!ms) return stream
+
+    let reader = stream.getReader()
+    return new ReadableStream({
+        pull: async (c) => {
+            try {
+                let data = await addTimeout(reader.read(), ms, onTimeout)
+
+                if (data.done) {
+                    c.close()
+                } else {
+                    c.enqueue(data.value)
+                }
+            } catch (e) {
+                c.error(e)
+                await reader.cancel()
+            }
+        },
+        cancel: async (reason) => {
+            await reader.cancel(reason)
+        },
+    })
+}
+
 export class TimeoutError extends Error {
     constructor(ms: number) {
         super(`timed out after ${ms} ms`)

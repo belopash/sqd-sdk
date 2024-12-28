@@ -1,5 +1,5 @@
 import {applyRangeBound, mapRangeRequestList, mergeRangeRequests, Range} from '@subsquid/util-internal-range'
-import {PortalClient} from '@subsquid/portal-client'
+import {PortalClient, PortalStreamData} from '@subsquid/portal-client'
 import {DataRequest} from './interfaces/data-request'
 import {BlockData, FieldSelection} from './interfaces/data'
 import {assertNotNull, AsyncQueue, Throttler, unexpectedCase, weakMemo} from '@subsquid/util-internal'
@@ -100,24 +100,41 @@ export class EvmPortalDataSource<Fields extends FieldSelection, Block extends Bl
         const ingest = async () => {
             let query = applyRangeBound(this.query, range)
 
-            for (let queryRange of query) {
-                let request = {
-                    type: 'evm',
-                    fromBlock: queryRange.range.from,
-                    toBlock: queryRange.range.to,
-                    fields: this.fields,
-                    ...queryRange.request,
-                }
+            function abort() {
+                reader?.cancel()
+            }
 
-                for await (let data of this.portal.getFinalizedStream(request, {abort: ac.signal})) {
-                    let blocks = data.blocks.map((b) => mapBlock(b, this.fields) as unknown as Block)
+            ac.signal.addEventListener('abort', abort)
 
-                    await queue.put({
-                        finalizedHead: data.finalizedHead,
-                        blocks,
-                        rolledbackHeads: [],
-                    })
+            let reader: ReadableStreamDefaultReader<PortalStreamData<any>> | undefined
+            try {
+                for (let queryRange of query) {
+                    let request = {
+                        type: 'evm',
+                        fromBlock: queryRange.range.from,
+                        toBlock: queryRange.range.to,
+                        fields: this.fields,
+                        ...queryRange.request,
+                    }
+
+                    reader = this.portal.getFinalizedStream(request).getReader()
+
+                    while (true) {
+                        let data = await reader.read()
+                        if (data.done) break
+
+                        let blocks = data.value.blocks.map((b) => mapBlock(b, this.fields) as unknown as Block)
+
+                        await queue.put({
+                            finalizedHead: data.value.finalizedHead,
+                            blocks,
+                            rolledbackHeads: [],
+                        })
+                    }
                 }
+            } finally {
+                ac.signal.removeEventListener('abort', abort)
+                reader?.cancel()
             }
         }
 

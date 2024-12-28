@@ -112,7 +112,7 @@ export class AsyncQueue<T> {
     }
 
     async wait(): Promise<void> {
-        if (this.closed) throw new ClosedQueueError()
+        if (this.closed) return
         if (this.size < this.buf.length) return
         assert(this.putFuture == null, 'concurrent puts and waits are not allowed')
         this.putFuture = createFuture()
