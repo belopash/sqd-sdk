@@ -1,6 +1,17 @@
+import {Range} from '@subsquid/util-internal-range'
 import {Bytes, Bytes20, Bytes32} from './base'
-import {FieldSelection} from './data'
 import {EvmStateDiff} from './evm'
+
+
+export type EvmQuery = {
+    ranges: EvmQueryRange[]
+}
+
+
+export type EvmQueryRange = {
+    range: Range
+    request: DataRequest
+}
 
 
 export interface DataRequest {

@@ -1,8 +1,8 @@
-import {applyRangeBound, mapRangeRequestList, mergeRangeRequests, Range} from '@subsquid/util-internal-range'
+import {applyRangeBound, Range} from '@subsquid/util-internal-range'
 import {PortalClient, PortalStreamData} from '@subsquid/portal-client'
-import {DataRequest} from './interfaces/data-request'
+import {EvmQuery} from './interfaces/data-request'
 import {BlockData, FieldSelection} from './interfaces/data'
-import {assertNotNull, AsyncQueue, Throttler, unexpectedCase, weakMemo} from '@subsquid/util-internal'
+import {assertNotNull, AsyncQueue, unexpectedCase, weakMemo} from '@subsquid/util-internal'
 import {
     array,
     BYTES,
@@ -59,16 +59,9 @@ export interface DataSource<Block> {
 
 export type GetDataSourceBlock<T> = T extends DataSource<infer B> ? B : never
 
-export type QueryRange = {
-    range: Range
-    request: DataRequest
-}
-
-export type Query = QueryRange | QueryRange[]
-
 export interface EvmPortalDataSourceOptions<Fields extends FieldSelection> {
     portal: string | PortalClient
-    query: Query
+    query: EvmQuery
     fields: Fields
 }
 
@@ -76,12 +69,12 @@ export class EvmPortalDataSource<Fields extends FieldSelection, Block extends Bl
     implements DataSource<StreamData<Block>>
 {
     private portal: PortalClient
-    private query: QueryRange[]
+    private query: EvmQuery
     private fields: Fields
 
     constructor(options: EvmPortalDataSourceOptions<Fields>) {
         this.portal = typeof options.portal === 'string' ? new PortalClient({url: options.portal}) : options.portal
-        this.query = Array.isArray(options.query) ? options.query : [options.query]
+        this.query = options.query
         this.fields = options.fields
     }
 
@@ -98,7 +91,7 @@ export class EvmPortalDataSource<Fields extends FieldSelection, Block extends Bl
         let ac = new AbortController()
 
         const ingest = async () => {
-            let query = applyRangeBound(this.query, range)
+            let query = applyRangeBound(this.query.ranges, range)
 
             function abort() {
                 reader?.cancel()
