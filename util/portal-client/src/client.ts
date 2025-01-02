@@ -1,8 +1,6 @@
-import {HttpClient, HttpResponse} from '@subsquid/http-client'
+import {HttpClient, HttpResponse, HttpBodyTimeoutError} from '@subsquid/http-client'
 import type {Logger} from '@subsquid/logger'
 import {AsyncQueue, last, Throttler, wait, withErrorContext} from '@subsquid/util-internal'
-import {addStreamTimeout} from '@subsquid/util-timeout'
-import assert from 'assert'
 
 export interface HashAndHeight {
     hash: string
@@ -30,7 +28,6 @@ export interface PortalClientOptions {
     durationThreshold?: number
 
     headPollInterval?: number
-    streamBodyTimeout?: number
 
     log?: Logger
 }
@@ -74,7 +71,6 @@ export class PortalClient {
     private bufferThreshold: number
     private newBlockThreshold: number
     private durationThreshold: number
-    private streamBodyTimeout: number
     private log?: Logger
 
     constructor(options: PortalClientOptions) {
@@ -85,7 +81,6 @@ export class PortalClient {
         this.bufferThreshold = options.bufferSizeThreshold ?? 10 * 1024 * 1024
         this.newBlockThreshold = options.newBlockThreshold ?? 300
         this.durationThreshold = options.durationThreshold ?? 5_000
-        this.streamBodyTimeout = options.streamBodyTimeout ?? 60_000
     }
 
     private getDatasetUrl(path: string): string {
@@ -101,7 +96,6 @@ export class PortalClient {
     async getFinalizedHeight(options?: PortalRequestOptions): Promise<number> {
         let res: string = await this.client.get(this.getDatasetUrl('finalized-stream/height'), options)
         let height = parseInt(res)
-        assert(Number.isSafeInteger(height))
         return height
     }
 
@@ -140,7 +134,6 @@ export class PortalClient {
                 newBlockThreshold: this.newBlockThreshold,
                 durationThreshold: this.durationThreshold,
                 headPollInterval: this.headPollInterval,
-                streamBodyTimeout: this.streamBodyTimeout,
                 ...options,
             }
 
@@ -191,11 +184,7 @@ export class PortalClient {
 
                     abortStream.signal.addEventListener('abort', abort, {once: true})
 
-                    reader = addStreamTimeout(
-                        res.body,
-                        streamBodyTimeout,
-                        () => new StreamBodyTimeoutError(streamBodyTimeout)
-                    )
+                    reader = res.body
                         .pipeThrough(new TextDecoderStream('utf8'))
                         .pipeThrough(new LineSplitStream('\n'))
                         .getReader()
@@ -237,7 +226,7 @@ export class PortalClient {
                     }
                 } catch (err) {
                     if (abortStream.signal.aborted) {
-                    } else if (err instanceof StreamBodyTimeoutError) {
+                    } else if (err instanceof HttpBodyTimeoutError) {
                         this.log?.warn(`resetting stream: ${err.message}`)
                     } else {
                         throw err
@@ -374,11 +363,5 @@ class LineSplitStream implements ReadableWritablePair<string[], string> {
                 controller.terminate()
             },
         })
-    }
-}
-
-class StreamBodyTimeoutError extends Error {
-    constructor(ms: number) {
-        super(`stream body timed out after ${ms} ms`)
     }
 }

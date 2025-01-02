@@ -1,7 +1,6 @@
 import {PortalClient} from '@subsquid/portal-client'
 import {HttpClient} from '@subsquid/http-client'
 import {createLogger} from '@subsquid/logger'
-import {EvmPortalDataSource, Query} from '@subsquid/evm-stream'
 
 async function main() {
     let portal = new PortalClient({
@@ -43,11 +42,11 @@ async function main() {
     //     },
     // })
 
-    let from = await portal.getFinalizedHeight().then((h) => h - 1_000_000)
+    let fromBlock = await portal.getFinalizedHeight().then((h) => h - 1_000_000)
 
     let query = {
         type: 'evm',
-        fromBlock: 20495180,
+        fromBlock,
         fields: {
             block: {timestamp: true, size: true, number: true, hash: true, parentHash: true},
             transaction: {from: true, to: true, hash: true, transactionIndex: true},
