@@ -49,7 +49,6 @@ export interface PortalStreamOptions {
     durationThreshold?: number
 
     headPollInterval?: number
-    streamBodyTimeout?: number
 
     stopOnHead?: boolean
 }
@@ -128,16 +127,16 @@ export class PortalClient {
         query: Q,
         options?: PortalStreamOptions
     ): ReadableStream<PortalStreamData<B>> {
-        let {headPollInterval, newBlockThreshold, durationThreshold, bufferSizeThreshold, streamBodyTimeout, request} =
-            {
-                bufferSizeThreshold: this.bufferThreshold,
-                newBlockThreshold: this.newBlockThreshold,
-                durationThreshold: this.durationThreshold,
-                headPollInterval: this.headPollInterval,
-                ...options,
-            }
+        let {headPollInterval, newBlockThreshold, durationThreshold, bufferSizeThreshold, request, stopOnHead} = {
+            bufferSizeThreshold: this.bufferThreshold,
+            newBlockThreshold: this.newBlockThreshold,
+            durationThreshold: this.durationThreshold,
+            headPollInterval: this.headPollInterval,
+            ...options,
+        }
 
         let abortStream = new AbortController()
+        let abortSignal = abortStream.signal
         let buffer = new BlocksBuffer<B>(bufferSizeThreshold)
         let top = new Throttler(async () => {
             let height = await this.getFinalizedHeight()
@@ -155,20 +154,20 @@ export class PortalClient {
             let timeout: ReturnType<typeof setTimeout> | undefined
             let reader: ReadableStreamDefaultReader<string[]> | undefined
 
-            function abort() {
-                return reader?.cancel()
-            }
+            const abort = async () => reader?.cancel()
 
-            while (startBlock <= endBlock && !abortStream.signal.aborted) {
-                let archiveQuery = {...query, fromBlock: startBlock}
-                let res: HttpResponse<ReadableStream<Buffer>> | undefined
+            while (startBlock <= endBlock && !abortSignal.aborted) {
                 try {
-                    res = await this.client
-                        .request('POST', this.getDatasetUrl('finalized-stream'), {
+                    let archiveQuery = {
+                        ...query,
+                        fromBlock: startBlock,
+                    }
+                    let res = await this.client
+                        .request<ReadableStream<Buffer>>('POST', this.getDatasetUrl('finalized-stream'), {
                             ...request,
                             json: archiveQuery,
                             stream: true,
-                            abort: abortStream.signal,
+                            abort: abortSignal,
                         })
                         .catch(
                             withErrorContext({
@@ -177,17 +176,18 @@ export class PortalClient {
                         )
 
                     if (res.status === 204) {
-                        if (options?.stopOnHead) break
-                        await wait(headPollInterval, abortStream.signal)
+                        if (stopOnHead) break
+                        await wait(headPollInterval, abortSignal)
                         continue
                     }
-
-                    abortStream.signal.addEventListener('abort', abort, {once: true})
 
                     reader = res.body
                         .pipeThrough(new TextDecoderStream('utf8'))
                         .pipeThrough(new LineSplitStream('\n'))
                         .getReader()
+                    abortSignal.addEventListener('abort', abort, {once: true})
+
+                    timeout = setTimeout(() => buffer.ready(), durationThreshold)
 
                     let heartbeatInterval = Math.ceil(newBlockThreshold / 4)
                     heartbeat = new HeartBeat((diff) => {
@@ -196,8 +196,6 @@ export class PortalClient {
                         }
                     }, heartbeatInterval)
 
-                    timeout = setTimeout(() => buffer.ready(), durationThreshold)
-
                     while (true) {
                         let lines = await reader?.read()
                         if (lines.done) break
@@ -205,38 +203,35 @@ export class PortalClient {
                         heartbeat.pulse()
 
                         let size = 0
-                        let blocks = lines.value.map((line) => {
+                        let blocks: B[] = []
+
+                        for (let line of lines.value) {
                             let block = JSON.parse(line) as B
                             size += line.length
-                            return block
-                        })
+                            blocks.push(block)
+                        }
 
                         await buffer.put(blocks, size)
 
                         let lastBlock = last(blocks).header.number
                         startBlock = lastBlock + 1
-
-                        if (options?.stopOnHead) {
-                            let finalizedHead = await top.get()
-                            if (lastBlock >= finalizedHead.height) {
-                                await reader?.cancel()
-                                break
-                            }
-                        }
                     }
                 } catch (err) {
-                    if (abortStream.signal.aborted) {
+                    if (abortSignal.aborted) {
+                        // ignore
                     } else if (err instanceof HttpBodyTimeoutError) {
                         this.log?.warn(`resetting stream: ${err.message}`)
                     } else {
                         throw err
                     }
                 } finally {
-                    await reader?.cancel().catch(() => {})
-                    heartbeat?.stop()
                     buffer.ready()
+
+                    heartbeat?.stop()
                     clearTimeout(timeout)
-                    abortStream.signal.removeEventListener('abort', abort)
+                    abortSignal.removeEventListener('abort', abort)
+
+                    await reader?.cancel().catch(() => {})
                 }
             }
         }
