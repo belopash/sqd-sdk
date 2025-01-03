@@ -8,7 +8,6 @@ async function main() {
         http: new HttpClient({
             retryAttempts: Infinity,
         }),
-        log: createLogger('portal-client'),
     })
 
     // let query: Query = {t
