@@ -1,15 +1,11 @@
 import {HttpClient, HttpResponse, HttpBodyTimeoutError} from '@subsquid/http-client'
 import type {Logger} from '@subsquid/logger'
 import {AsyncQueue, last, Throttler, wait, withErrorContext} from '@subsquid/util-internal'
+import {BaseQuery} from './query/base'
 
 export interface HashAndHeight {
     hash: string
     height: number
-}
-
-export interface PortalQuery {
-    fromBlock: number
-    toBlock?: number
 }
 
 export interface Block {
@@ -98,7 +94,7 @@ export class PortalClient {
         return height
     }
 
-    getFinalizedQuery<B extends Block = Block, Q extends PortalQuery = PortalQuery>(
+    getFinalizedQuery<B extends Block = Block, Q extends BaseQuery = BaseQuery>(
         query: Q,
         options?: PortalRequestOptions
     ): Promise<B[]> {
@@ -123,7 +119,7 @@ export class PortalClient {
             })
     }
 
-    getFinalizedStream<B extends Block = Block, Q extends PortalQuery = PortalQuery>(
+    getFinalizedStream<B extends Block = Block, Q extends BaseQuery = BaseQuery>(
         query: Q,
         options?: PortalStreamOptions
     ): ReadableStream<PortalStreamData<B>> {

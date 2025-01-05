@@ -7,6 +7,7 @@ async function main() {
         url: 'https://portal.sqd.dev/datasets/ethereum-mainnet',
         http: new HttpClient({
             retryAttempts: Infinity,
+            // bodyTimeout: 10
         }),
         log: createLogger('portal-client'),
     })
