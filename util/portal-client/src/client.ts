@@ -1,21 +1,12 @@
-import {HttpClient, HttpResponse, HttpBodyTimeoutError} from '@subsquid/http-client'
-import type {Logger} from '@subsquid/logger'
+import {HttpClient, HttpBodyTimeoutError} from '@subsquid/http-client'
 import {AsyncQueue, last, Throttler, wait, withErrorContext} from '@subsquid/util-internal'
-import {BaseQuery} from './query/base'
+import {EvmQuery, EvmResponse} from './query/evm'
 
-export interface HashAndHeight {
-    hash: string
-    height: number
-}
+export type PortalQuery = EvmQuery
 
-export interface Block {
-    header: {
-        hash: string
-        number: number
-    }
-}
+export type PortalResponse<Q extends PortalQuery> = Q extends EvmQuery ? EvmResponse<Q> : any
 
-export interface PortalClientOptions {
+export type PortalClientOptions = {
     url: string
     http?: HttpClient
 
@@ -24,11 +15,9 @@ export interface PortalClientOptions {
     durationThreshold?: number
 
     headPollInterval?: number
-
-    log?: Logger
 }
 
-export interface PortalRequestOptions {
+export type PortalRequestOptions = {
     headers?: HeadersInit
     retryAttempts?: number
     retrySchedule?: number[]
@@ -37,7 +26,7 @@ export interface PortalRequestOptions {
     abort?: AbortSignal
 }
 
-export interface PortalStreamOptions {
+export type PortalStreamOptions = {
     request?: Omit<PortalRequestOptions, 'abort'>
 
     bufferSizeThreshold?: number
@@ -49,14 +38,12 @@ export interface PortalStreamOptions {
     stopOnHead?: boolean
 }
 
-export interface PortalStreamData<B extends Block> {
-    finalizedHead: HashAndHeight
-    blocks: B[]
-}
-
-export interface PortalStreamData<B extends Block> {
-    finalizedHead: HashAndHeight
-    blocks: B[]
+export type PortalStreamData<R extends PortalResponse<any>> = {
+    finalizedHead: {
+        number: number
+        hash: string
+    }
+    blocks: R[]
 }
 
 export class PortalClient {
@@ -66,11 +53,9 @@ export class PortalClient {
     private bufferThreshold: number
     private newBlockThreshold: number
     private durationThreshold: number
-    private log?: Logger
 
     constructor(options: PortalClientOptions) {
         this.url = new URL(options.url)
-        this.log = options.log
         this.client = options.http || new HttpClient()
         this.headPollInterval = options.headPollInterval ?? 5_000
         this.bufferThreshold = options.bufferSizeThreshold ?? 10 * 1024 * 1024
@@ -94,10 +79,10 @@ export class PortalClient {
         return height
     }
 
-    getFinalizedQuery<B extends Block = Block, Q extends BaseQuery = BaseQuery>(
+    getFinalizedQuery<Q extends PortalQuery, R extends PortalResponse<Q>>(
         query: Q,
         options?: PortalRequestOptions
-    ): Promise<B[]> {
+    ): Promise<R[]> {
         // FIXME: is it needed or it is better to always use stream?
         return this.client
             .request<Buffer>('POST', this.getDatasetUrl(`finalized-stream`), {
@@ -119,10 +104,10 @@ export class PortalClient {
             })
     }
 
-    getFinalizedStream<B extends Block = Block, Q extends BaseQuery = BaseQuery>(
+    getFinalizedStream<Q extends PortalQuery, R extends PortalResponse<Q> = PortalResponse<Q>>(
         query: Q,
         options?: PortalStreamOptions
-    ): ReadableStream<PortalStreamData<B>> {
+    ): ReadableStream<PortalStreamData<R>> {
         let {headPollInterval, newBlockThreshold, durationThreshold, bufferSizeThreshold, request, stopOnHead} = {
             bufferSizeThreshold: this.bufferThreshold,
             newBlockThreshold: this.newBlockThreshold,
@@ -133,17 +118,17 @@ export class PortalClient {
 
         let abortStream = new AbortController()
         let abortSignal = abortStream.signal
-        let buffer = new BlocksBuffer<B>(bufferSizeThreshold)
+        let buffer = new BlocksBuffer<R>(bufferSizeThreshold)
         let top = new Throttler(async () => {
-            let height = await this.getFinalizedHeight()
+            let number = await this.getFinalizedHeight()
             return {
-                height,
+                number,
                 hash: '0x',
             }
         }, 10_000)
 
         const ingest = async () => {
-            let startBlock = query.fromBlock
+            let startBlock = query.fromBlock ?? 0
             let endBlock = query.toBlock ?? Infinity
 
             let heartbeat: HeartBeat | undefined
@@ -199,10 +184,10 @@ export class PortalClient {
                         heartbeat.pulse()
 
                         let size = 0
-                        let blocks: B[] = []
+                        let blocks: R[] = []
 
                         for (let line of lines.value) {
-                            let block = JSON.parse(line) as B
+                            let block = JSON.parse(line) as R
                             size += line.length
                             blocks.push(block)
                         }
@@ -216,7 +201,7 @@ export class PortalClient {
                     if (abortSignal.aborted) {
                         // ignore
                     } else if (err instanceof HttpBodyTimeoutError) {
-                        this.log?.warn(`resetting stream: ${err.message}`)
+                        // ignore
                     } else {
                         throw err
                     }
@@ -232,7 +217,7 @@ export class PortalClient {
             }
         }
 
-        return new ReadableStream<PortalStreamData<B>>({
+        return new ReadableStream<PortalStreamData<R>>({
             start: async (controller) => {
                 ingest()
                     .then(() => {
@@ -262,7 +247,7 @@ export class PortalClient {
     }
 }
 
-class BlocksBuffer<B extends Block> {
+class BlocksBuffer<B> {
     private blocks: B[] = []
     private queue: AsyncQueue<B[]>
     private size = 0
