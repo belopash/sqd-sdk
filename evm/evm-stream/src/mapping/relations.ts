@@ -1,13 +1,87 @@
-import {maybeLast} from '@subsquid/util-internal'
-import {Block, Trace, Transaction} from './entities'
+import {maybeLast, unexpectedCase} from '@subsquid/util-internal'
+import {
+    BlockEntity,
+    LogEntity,
+    StateDiffAddEntity,
+    StateDiffChangeEntity,
+    StateDiffDeleteEntity,
+    StateDiffNoChangeEntity,
+    TraceCallEntity,
+    TraceCreateEntity,
+    TraceEntity,
+    TraceRewardEntity,
+    TraceSuicideEntity,
+    TransactionEntity,
+    TransactionReceiptEntity,
+} from './entities'
+import {
+    BlockFields,
+    LogFields,
+    StateDiffFields,
+    TraceFields,
+    TransactionFields,
+    TransactionReceiptFields,
+} from '../interfaces/evm'
+import {
+    Block,
+    BlockRequiredFields,
+    FieldSelection,
+    LogRequiredFields,
+    StateDiffRequiredFields,
+    TraceRequiredFields,
+    TransactionReceiptRequiredFields,
+    TransactionRequiredFields,
+} from '../interfaces/data'
 
+export function setUpRelations<F extends FieldSelection>(data: {
+    block: Pick<BlockFields, BlockRequiredFields>
+    logs: Pick<LogFields, LogRequiredFields>[]
+    transactions: Pick<TransactionFields, TransactionRequiredFields>[]
+    receipts: Pick<TransactionReceiptFields, TransactionReceiptRequiredFields>[]
+    traces: Pick<TraceFields, TraceRequiredFields>[]
+    stateDiffs: Pick<StateDiffFields, StateDiffRequiredFields>[]
+}): Block<F> {
+    let block = Object.assign(new BlockEntity(), data.block)
 
-export function setUpRelations(block: Block): void {
-    block.transactions.sort((a, b) => a.transactionIndex - b.transactionIndex)
-    block.logs.sort((a, b) => a.logIndex - b.logIndex)
-    block.traces.sort(traceCompare)
+    block.logs = data.logs.map((log) => Object.assign(new LogEntity(), log)).sort((a, b) => a.logIndex - b.logIndex)
+    block.transactions = data.transactions
+        .map((tx) => Object.assign(new TransactionEntity(), tx))
+        .sort((a, b) => a.transactionIndex - b.transactionIndex)
+    block.receipts = data.receipts
+        .map((rec) => Object.assign(new TransactionReceiptEntity(), rec))
+        .sort((a, b) => a.transactionIndex - b.transactionIndex)
+    block.traces = data.traces
+        .map((trace) => {
+            switch (trace.type) {
+                case 'create':
+                    return Object.assign(new TraceCreateEntity(), trace)
+                case 'call':
+                    return Object.assign(new TraceCallEntity(), trace)
+                case 'reward':
+                    return Object.assign(new TraceRewardEntity(), trace)
+                case 'suicide':
+                    return Object.assign(new TraceSuicideEntity(), trace)
+                default:
+                    throw unexpectedCase(trace.type)
+            }
+        })
+        .sort(traceCompare)
+    block.stateDiffs = data.stateDiffs.map((diff) => {
+        switch (diff.kind) {
+            case '=':
+                return Object.assign(new StateDiffNoChangeEntity(), diff)
+            case '+':
+                return Object.assign(new StateDiffAddEntity(), diff)
+            case '-':
+                return Object.assign(new StateDiffDeleteEntity(), diff)
+            case '*':
+                return Object.assign(new StateDiffChangeEntity(), diff)
+            default:
+                throw unexpectedCase(diff.kind)
+        }
+    })
 
-    let txs: (Transaction | undefined)[] = new Array((maybeLast(block.transactions)?.transactionIndex ?? -1) + 1)
+    let txs: (TransactionEntity | undefined)[] = new Array((maybeLast(block.transactions)?.transactionIndex ?? -1) + 1)
     for (let tx of block.transactions) {
         txs[tx.transactionIndex] = tx
     }
@@ -19,7 +93,7 @@ export function setUpRelations(block: Block): void {
             tx.logs.push(rec)
         }
     }
-
+ 
     for (let i = 0; i < block.traces.length; i++) {
         let rec = block.traces[i]
         let tx = txs[rec.transactionIndex]
@@ -47,13 +121,13 @@ export function setUpRelations(block: Block): void {
             tx.stateDiffs.push(rec)
         }
     }
+
+    return block as Block<F>
 }
 
-
-function traceCompare(a: Trace, b: Trace) {
+function traceCompare(a: TraceEntity, b: TraceEntity) {
     return a.transactionIndex - b.transactionIndex || addressCompare(a.traceAddress, b.traceAddress)
 }
-
 
 function addressCompare(a: number[], b: number[]): number {
     for (let i = 0; i < Math.min(a.length, b.length); i++) {
@@ -63,8 +137,7 @@ function addressCompare(a: number[], b: number[]): number {
     return a.length - b.length // this differs from substrate call ordering
 }
 
-
-function isDescendent(parent: Trace, child: Trace): boolean {
+function isDescendent(parent: TraceEntity, child: TraceEntity): boolean {
     if (parent.transactionIndex != child.transactionIndex) return false
     if (parent.traceAddress.length >= child.traceAddress.length) return false
     for (let i = 0; i < parent.traceAddress.length; i++) {

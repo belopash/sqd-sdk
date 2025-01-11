@@ -1,19 +1,16 @@
 import type {
     AddPrefix,
-    ConditionalKeys,
+    Bytes,
+    Bytes20,
+    Bytes32,
+    Bytes8,
     ExcludeUndefined,
     RemoveEmptyObjects,
-    RemovePrefix,
-    // Schema,
+    RemoveKeysPrefix,
     Select,
     Selector,
     Simplify,
 } from '@subsquid/util-types'
-
-export type Bytes = string & {}
-export type Bytes8 = string & {}
-export type Bytes20 = string & {}
-export type Bytes32 = string & {}
 
 type _BlockHeader = {
     number: number
@@ -39,15 +36,6 @@ type _BlockHeader = {
     excessBlobGas: bigint
     l1BlockNumber?: number
 }
-export type BlockHeaderFieldSelection = Simplify<
-    Selector<keyof _BlockHeader> & {
-        hash: true
-        number: true
-    }
->
-export type BlockHeader<T extends keyof BlockHeaderFieldSelection = keyof BlockHeaderFieldSelection> = Simplify<
-    Select<_BlockHeader, T>
->
 
 type _Transaction = {
     transactionIndex: number
@@ -83,10 +71,6 @@ type _Transaction = {
     l1BlobBaseFeeScalar?: number
     l1BaseFeeScalar?: number
 }
-export type TransactionFieldSelection = Selector<keyof _Transaction>
-export type Transaction<T extends keyof TransactionFieldSelection = keyof TransactionFieldSelection> = Simplify<
-    Select<_Transaction, T>
->
 
 type _Log = {
     logIndex: number
@@ -96,10 +80,8 @@ type _Log = {
     data: Bytes
     topics: Bytes32[]
 }
-export type LogFieldSelection = Selector<keyof _Log>
-export type Log<T extends keyof LogFieldSelection = keyof LogFieldSelection> = Simplify<Select<_Log, T>>
 
-type TraceBase = {
+type _TraceBase = {
     type: string
     transactionIndex: number
     traceAddress: number[]
@@ -108,39 +90,26 @@ type TraceBase = {
     revertReason?: string
 }
 
+type _TraceCreate = _TraceBase & {
+    type: 'create'
+}
+
 type _TraceCreateAction = {
     from: Bytes20
     value: bigint
     gas: bigint
     init: Bytes
 }
-export type TraceCreateActionFieldSelection = Selector<keyof _TraceCreateAction>
-export type TraceCreateAction<T extends keyof TraceCreateActionFieldSelection = keyof TraceCreateActionFieldSelection> =
-    Simplify<Select<_TraceCreateAction, T>>
 
 type _TraceCreateResult = {
     gasUsed: bigint
     code: Bytes
     address: Bytes20
 }
-export type TraceCreateResultFieldSelection = Selector<keyof _TraceCreateResult>
-export type TraceCreateResult<T extends keyof TraceCreateResultFieldSelection = keyof TraceCreateResultFieldSelection> =
-    Simplify<Select<_TraceCreateResult, T>>
 
-type _TraceCreate = TraceBase & {
-    type: 'create'
+type _TraceCall = _TraceBase & {
+    type: 'call'
 }
-export type TraceCreateFieldSelection = Selector<keyof _TraceCreate> &
-    TraceCreateActionFieldSelection &
-    Selector<AddPrefix<'result', keyof TraceCreateResultFieldSelection>>
-export type TraceCreate<T extends keyof TraceCreateFieldSelection = keyof TraceCreateFieldSelection> = Simplify<
-    RemoveEmptyObjects<
-        Select<_TraceCreate, T> & {
-            action: TraceCreateAction<Extract<T, keyof TraceCreateActionFieldSelection>>
-            result?: TraceCreateResult<Extract<RemovePrefix<'result', T>, keyof TraceCreateResultFieldSelection>>
-        }
-    >
->
 
 type _TraceCallAction = {
     callType: string
@@ -151,88 +120,31 @@ type _TraceCallAction = {
     input: Bytes
     sighash: Bytes
 }
-export type TraceCallActionFieldSelection = Selector<keyof _TraceCallAction>
-export type TraceCallAction<T extends keyof TraceCallActionFieldSelection = keyof TraceCallActionFieldSelection> =
-    Simplify<Select<_TraceCallAction, T>>
 
 type _TraceCallResult = {
     gasUsed: bigint
     output: Bytes
 }
-export type TraceCallResultFieldSelection = Selector<keyof _TraceCallResult>
-export type TraceCallResult<T extends keyof TraceCallResultFieldSelection = keyof TraceCallResultFieldSelection> =
-    Simplify<Select<_TraceCallResult, T>>
 
-type _TraceCall = TraceBase & {
-    type: 'call'
+type _TraceSuicide = _TraceBase & {
+    type: 'suicide'
 }
-export type TraceCallFieldSelection = Selector<keyof _TraceCall> &
-    TraceCallActionFieldSelection &
-    Selector<AddPrefix<'result', keyof TraceCallResultFieldSelection>>
-export type TraceCall<T extends keyof TraceCallFieldSelection = keyof TraceCallFieldSelection> = Simplify<
-    RemoveEmptyObjects<
-        Select<_TraceCall, T> & {
-            action: TraceCallAction<Extract<T, keyof TraceCallActionFieldSelection>>
-            result?: TraceCallResult<Extract<RemovePrefix<'result', T>, keyof TraceCallResultFieldSelection>>
-        }
-    >
->
 
 type _TraceSuicideAction = {
     address: Bytes20
     refundAddress: Bytes20
     balance: bigint
 }
-export type TraceSuicideActionFieldSelection = Selector<keyof _TraceSuicideAction>
-export type TraceSuicideAction<
-    T extends keyof TraceSuicideActionFieldSelection = keyof TraceSuicideActionFieldSelection
-> = Simplify<Select<_TraceSuicideAction, T>>
 
-type _TraceSuicide = TraceBase & {
-    type: 'suicide'
+type _TraceReward = _TraceBase & {
+    type: 'reward'
 }
-export type TraceSuicideFieldSelection = Selector<keyof _TraceSuicide> & TraceSuicideActionFieldSelection
-export type TraceSuicide<T extends keyof TraceSuicideFieldSelection = keyof TraceSuicideFieldSelection> = Simplify<
-    RemoveEmptyObjects<
-        Select<_TraceSuicide, T> & {
-            action: TraceSuicideAction<Extract<T, keyof TraceSuicideActionFieldSelection>>
-        }
-    >
->
 
 type _TraceRewardAction = {
     author: Bytes20
     value: bigint
     type: string
 }
-export type TraceRewardActionFieldSelection = Selector<keyof _TraceRewardAction>
-export type TraceRewardAction<T extends keyof TraceRewardActionFieldSelection = keyof TraceRewardActionFieldSelection> =
-    Simplify<Select<_TraceRewardAction, T>>
-
-type _TraceReward = TraceBase & {
-    type: 'reward'
-}
-export type TraceRewardFieldSelection = Selector<keyof _TraceReward> & TraceRewardActionFieldSelection
-export type TraceReward<T extends keyof TraceRewardFieldSelection = keyof TraceRewardFieldSelection> = Simplify<
-    RemoveEmptyObjects<
-        Select<_TraceReward, T> & {
-            action: TraceRewardAction<Extract<T, keyof TraceRewardActionFieldSelection>>
-        }
-    >
->
-
-export type TraceFieldSelection = Selector<keyof TraceBase> &
-    Selector<AddPrefix<'create', Exclude<keyof TraceCreateFieldSelection, keyof TraceBase>>> &
-    Selector<AddPrefix<'call', Exclude<keyof TraceCallFieldSelection, keyof TraceBase>>> &
-    Selector<AddPrefix<'suicide', Exclude<keyof TraceSuicideFieldSelection, keyof TraceBase>>> &
-    Selector<AddPrefix<'reward', Exclude<keyof TraceRewardFieldSelection, keyof TraceBase>>>
-export type Trace<T extends keyof TraceFieldSelection = keyof TraceFieldSelection> =
-    | TraceCreate<Extract<T, keyof TraceBase> | Extract<RemovePrefix<'create', T>, keyof TraceCreateFieldSelection>>
-    | TraceCall<Extract<T, keyof TraceBase> | Extract<RemovePrefix<'call', T>, keyof TraceCallFieldSelection>>
-    | TraceSuicide<Extract<T, keyof TraceBase> | Extract<RemovePrefix<'suicide', T>, keyof TraceSuicideFieldSelection>>
-    | TraceReward<Extract<T, keyof TraceBase> | Extract<RemovePrefix<'reward', T>, keyof TraceRewardFieldSelection>>
-
-type A = Trace
 
 type _StateDiffBase = {
     transactionIndex: number
@@ -243,49 +155,125 @@ type _StateDiffBase = {
     next?: unknown
 }
 
+type _StateDiffAdd = _StateDiffBase & {
+    kind: '+'
+    prev?: null
+    next: Bytes
+}
+
+type _StateDiffNoChange = _StateDiffBase & {
+    kind: '='
+    prev?: null
+    next?: null
+}
+
+type _StateDiffChange = _StateDiffBase & {
+    kind: '*'
+    prev: Bytes
+    next: Bytes
+}
+
+type _StateDiffDelete = _StateDiffBase & {
+    kind: '-'
+    prev: Bytes
+    next?: null
+}
+
+type Trues<T> = {[K in keyof T]-?: true}
+
+export type BlockHeaderFieldSelection = Simplify<
+    Selector<keyof _BlockHeader> & {
+        hash: true
+        number: true
+    }
+>
+export type BlockHeader<T extends BlockHeaderFieldSelection = Trues<BlockHeaderFieldSelection>> = Simplify<
+    Select<_BlockHeader, T>
+>
+
+export type TransactionFieldSelection = Selector<keyof _Transaction>
+export type Transaction<T extends TransactionFieldSelection = Trues<TransactionFieldSelection>> = Simplify<
+    Select<_Transaction, T>
+>
+
+export type LogFieldSelection = Selector<keyof _Log>
+export type Log<T extends LogFieldSelection = Trues<LogFieldSelection>> = Simplify<Select<_Log, T>>
+
+export type TraceFieldSelection = Selector<
+    | keyof _TraceBase
+    | AddPrefix<'create', keyof _TraceCreateAction>
+    | AddPrefix<'createResult', keyof _TraceCreateResult>
+    | AddPrefix<'call', keyof _TraceCallAction>
+    | AddPrefix<'callResult', keyof _TraceCallResult>
+    | AddPrefix<'suicide', keyof _TraceSuicideAction>
+    | AddPrefix<'reward', keyof _TraceRewardAction>
+>
+
+export type TraceCreateAction<F extends TraceFieldSelection = Trues<TraceFieldSelection>> = Simplify<
+    Select<_TraceCreateAction, RemoveKeysPrefix<'create', F>>
+>
+
+export type TraceCreateResult<F extends TraceFieldSelection = Trues<TraceFieldSelection>> = Simplify<
+    Select<_TraceCreateResult, RemoveKeysPrefix<'createResult', F>>
+>
+
+export type TraceCallAction<F extends TraceFieldSelection = Trues<TraceFieldSelection>> = Simplify<
+    Select<_TraceCallAction, RemoveKeysPrefix<'call', F>>
+>
+
+export type TraceCallResult<F extends TraceFieldSelection = Trues<TraceFieldSelection>> = Simplify<
+    Select<_TraceCallResult, RemoveKeysPrefix<'callResult', F>>
+>
+
+export type TraceSuicideAction<F extends TraceFieldSelection = Trues<TraceFieldSelection>> = Simplify<
+    Select<_TraceSuicideAction, RemoveKeysPrefix<'suicide', F>>
+>
+
+export type TraceRewardAction<F extends TraceFieldSelection = Trues<TraceFieldSelection>> = Simplify<
+    Select<_TraceRewardAction, RemoveKeysPrefix<'reward', F>>
+>
+
+export type TraceCreate<F extends TraceFieldSelection = Trues<TraceFieldSelection>> = Simplify<
+    Select<_TraceCreate, F> & RemoveEmptyObjects<{action: TraceCreateAction<F>; result?: TraceCreateResult<F>}>
+>
+
+export type TraceCall<F extends TraceFieldSelection = Trues<TraceFieldSelection>> = Simplify<
+    Select<_TraceCall, F> & RemoveEmptyObjects<{action: TraceCallAction<F>; result?: TraceCallResult<F>}>
+>
+
+export type TraceSuicide<F extends TraceFieldSelection = Trues<TraceFieldSelection>> = Simplify<
+    Select<_TraceSuicide, F> & RemoveEmptyObjects<{action: TraceSuicideAction<F>}>
+>
+
+export type TraceReward<F extends TraceFieldSelection = Trues<TraceFieldSelection>> = Simplify<
+    Select<_TraceReward, F> & RemoveEmptyObjects<{action: TraceRewardAction<F>}>
+>
+
+export type Trace<F extends TraceFieldSelection = Trues<TraceFieldSelection>> = F extends any
+    ? TraceCreate<F> | TraceCall<F> | TraceSuicide<F> | TraceReward<F>
+    : never
+
 export type StateDiffFieldSelection = Selector<keyof _StateDiffBase>
 
-type _StateDiffNoChange = Simplify<
-    _StateDiffBase & {
-        kind: '='
-        prev?: null
-        next?: null
-    }
+export type StateDiffNoChange<F extends StateDiffFieldSelection = Trues<StateDiffFieldSelection>> = Simplify<
+    Select<_StateDiffNoChange, F>
 >
 
-export type StateDiffNoChange<F extends StateDiffFieldSelection | true = true> = Simplify<
-    Select<_StateDiffNoChange, ConditionalKeys<F>, true>
+export type StateDiffAdd<F extends StateDiffFieldSelection = Trues<StateDiffFieldSelection>> = Simplify<
+    Select<_StateDiffAdd, F>
 >
 
-type _StateDiffAdd = Simplify<
-    _StateDiffBase & {
-        kind: '+'
-        prev?: null
-        next: Bytes
-    }
+export type StateDiffChange<F extends StateDiffFieldSelection = Trues<StateDiffFieldSelection>> = Simplify<
+    Select<_StateDiffChange, F>
 >
 
-export type StateDiffAdd<F extends StateDiffFieldSelection | true = true> = Simplify<
-    Select<_StateDiffAdd, ConditionalKeys<F>, true>
+export type StateDiffDelete<F extends StateDiffFieldSelection = Trues<StateDiffFieldSelection>> = Simplify<
+    Select<_StateDiffDelete, F>
 >
 
-type _StateDiffChange = Simplify<
-    StateDiffBase & {
-        kind: '*'
-        prev: Bytes
-        next: Bytes
-    }
->
-
-export type StateDiffDelete = Simplify<
-    StateDiffBase & {
-        kind: '-'
-        prev: Bytes
-        next?: null
-    }
->
-
-export type StateDiff = StateDiffNoChange | StateDiffAdd | StateDiffChange | StateDiffDelete
+export type StateDiff<F extends StateDiffFieldSelection = Trues<StateDiffFieldSelection>> = F extends any
+    ? StateDiffNoChange<F> | StateDiffAdd<F> | StateDiffChange<F> | StateDiffDelete<F>
+    : never
 
 export type FieldSelection = {
     block: BlockHeaderFieldSelection
@@ -343,17 +331,17 @@ export type EvmQuery = Simplify<{
     fromBlock?: number
     toBlock?: number
     fields: FieldSelection
-    logs: LogsRequest[]
-    transactions: TransactionRequest[]
-    traces: TraceRequest[]
-    stateDiffs: StateDiffRequest[]
-    includeAllBlocks: boolean
+    logs?: LogsRequest[]
+    transactions?: TransactionRequest[]
+    traces?: TraceRequest[]
+    stateDiffs?: StateDiffRequest[]
+    includeAllBlocks?: boolean
 }>
 
 export type EvmResponse<Q extends EvmQuery> = Simplify<{
     header: BlockHeader<Q['fields']['block']>
-    logs: Log<ExcludeUndefined<Q['fields']['log']>>[]
-    transactions: Transaction<ExcludeUndefined<Q['fields']['transaction']>>[]
-    traces: Simplify<Select<Trace, ConditionalKeys<Q['fields']['trace']>>, true>[]
-    stateDiffs: Simplify<Select<StateDiff, ConditionalKeys<Q['fields']['stateDiff']>>, true>[]
+    logs?: Log<ExcludeUndefined<Q['fields']['log']>>[]
+    transactions?: Transaction<ExcludeUndefined<Q['fields']['transaction']>>[]
+    traces?: Trace<ExcludeUndefined<Q['fields']['trace']>>[]
+    stateDiffs?: StateDiff<ExcludeUndefined<Q['fields']['stateDiff']>>[]
 }>

@@ -1,7 +1,7 @@
 import {applyRangeBound, Range} from '@subsquid/util-internal-range'
-import {PortalClient, PortalStreamData} from '@subsquid/portal-client'
+import {PortalClient, PortalQuery, PortalStreamData} from '@subsquid/portal-client'
 import {EvmQuery} from './interfaces/data-request'
-import {BlockData, FieldSelection} from './interfaces/data'
+import {BlockData} from './interfaces/data'
 import {assertNotNull, AsyncQueue, unexpectedCase, weakMemo} from '@subsquid/util-internal'
 import {
     array,
@@ -15,20 +15,20 @@ import {
     withDefault,
 } from '@subsquid/util-internal-validation'
 import {
-    BlockHeader,
-    Transaction,
+    BlockEntity,
+    TransactionEntity,
     Log,
-    TraceCreate,
-    TraceCall,
-    TraceSuicide,
-    TraceReward,
-    StateDiffNoChange,
-    StateDiffAdd,
-    StateDiffChange,
-    StateDiffDelete,
-    Block,
-    StateDiff,
-    Trace,
+    TraceCreateEntity,
+    TraceCallEntity,
+    TraceSuicideEntity,
+    TraceRewardEntity,
+    StateDiffNoChangeEntity,
+    StateDiffAddEntity,
+    StateDiffChangeEntity,
+    StateDiffDeleteEntity,
+    BlockEntity,
+    StateDiffEntity,
+    TraceEntity,
 } from './mapping/entities'
 import {setUpRelations} from './mapping/relations'
 import {
@@ -39,6 +39,7 @@ import {
     getTraceFrameValidator,
     project,
 } from './mapping/schema'
+import {FieldSelection} from '@subsquid/portal-client/lib/query/evm'
 
 export interface HashAndHeight {
     hash: string
@@ -108,7 +109,7 @@ export class EvmPortalDataSource<Fields extends FieldSelection, Block extends Bl
                         toBlock: queryRange.range.to,
                         fields: this.fields,
                         ...queryRange.request,
-                    }
+                    } satisfies PortalQuery
 
                     reader = this.portal.getFinalizedStream(request).getReader()
 
@@ -119,7 +120,10 @@ export class EvmPortalDataSource<Fields extends FieldSelection, Block extends Bl
                         let blocks = data.value.blocks.map((b) => mapBlock(b, this.fields) as unknown as Block)
 
                         await queue.put({
-                            finalizedHead: data.value.finalizedHead,
+                            finalizedHead: {
+                                hash: data.value.finalizedHead.hash,
+                                height: data.value.finalizedHead.number,
+                            },
                             blocks,
                             rolledbackHeads: [],
                         })
@@ -194,7 +198,7 @@ export const getBlockValidator = weakMemo((fields: FieldSelection) => {
     })
 })
 
-export function mapBlock(rawBlock: unknown, fields: FieldSelection): Block {
+export function mapBlock(rawBlock: unknown, fields: FieldSelection): BlockEntity {
     let validator = getBlockValidator(fields)
 
     let src = cast(validator, rawBlock)
@@ -204,14 +208,14 @@ export function mapBlock(rawBlock: unknown, fields: FieldSelection): Block {
         hdr.timestamp = hdr.timestamp * 1000 // convert to ms
     }
 
-    let header = new BlockHeader(number, hash, parentHash)
+    let header = new BlockEntity(number, hash, parentHash)
     Object.assign(header, hdr)
 
-    let block = new Block(header)
+    let block = new BlockEntity(header)
 
     if (src.transactions) {
         for (let {transactionIndex, ...props} of src.transactions) {
-            let tx = new Transaction(header, transactionIndex)
+            let tx = new TransactionEntity(header, transactionIndex)
             Object.assign(tx, props)
             block.transactions.push(tx)
         }
@@ -228,19 +232,19 @@ export function mapBlock(rawBlock: unknown, fields: FieldSelection): Block {
     if (src.traces) {
         for (let {transactionIndex, traceAddress, type, ...props} of src.traces) {
             transactionIndex = assertNotNull(transactionIndex)
-            let trace: Trace
+            let trace: TraceEntity
             switch (type) {
                 case 'create':
-                    trace = new TraceCreate(header, transactionIndex, traceAddress)
+                    trace = new TraceCreateEntity(header, transactionIndex, traceAddress)
                     break
                 case 'call':
-                    trace = new TraceCall(header, transactionIndex, traceAddress)
+                    trace = new TraceCallEntity(header, transactionIndex, traceAddress)
                     break
                 case 'suicide':
-                    trace = new TraceSuicide(header, transactionIndex, traceAddress)
+                    trace = new TraceSuicideEntity(header, transactionIndex, traceAddress)
                     break
                 case 'reward':
-                    trace = new TraceReward(header, transactionIndex, traceAddress)
+                    trace = new TraceRewardEntity(header, transactionIndex, traceAddress)
                     break
                 default:
                     throw unexpectedCase()
@@ -252,19 +256,19 @@ export function mapBlock(rawBlock: unknown, fields: FieldSelection): Block {
 
     if (src.stateDiffs) {
         for (let {transactionIndex, address, key, kind, ...props} of src.stateDiffs) {
-            let diff: StateDiff
+            let diff: StateDiffEntity
             switch (kind) {
                 case '=':
-                    diff = new StateDiffNoChange(header, transactionIndex, address, key)
+                    diff = new StateDiffNoChangeEntity(header, transactionIndex, address, key)
                     break
                 case '+':
-                    diff = new StateDiffAdd(header, transactionIndex, address, key)
+                    diff = new StateDiffAddEntity(header, transactionIndex, address, key)
                     break
                 case '*':
-                    diff = new StateDiffChange(header, transactionIndex, address, key)
+                    diff = new StateDiffChangeEntity(header, transactionIndex, address, key)
                     break
                 case '-':
-                    diff = new StateDiffDelete(header, transactionIndex, address, key)
+                    diff = new StateDiffDeleteEntity(header, transactionIndex, address, key)
                     break
                 default:
                     throw unexpectedCase()

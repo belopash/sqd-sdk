@@ -1,18 +1,14 @@
 import {Range} from '@subsquid/util-internal-range'
-import {Bytes, Bytes20, Bytes32} from './base'
-import {EvmStateDiff} from './evm'
-
+import type {Bytes, Bytes20, Bytes32} from '@subsquid/util-types'
 
 export type EvmQuery = {
     ranges: EvmQueryRange[]
 }
 
-
 export type EvmQueryRange = {
     range: Range
     request: DataRequest
 }
-
 
 export interface DataRequest {
     includeAllBlocks?: boolean
@@ -22,30 +18,31 @@ export interface DataRequest {
     stateDiffs?: StateDiffRequest[]
 }
 
-
 export interface LogRequest {
     address?: Bytes20[]
     topic0?: Bytes32[]
     topic1?: Bytes32[]
     topic2?: Bytes32[]
     topic3?: Bytes32[]
-    transaction?: boolean
-    transactionTraces?: boolean
-    transactionLogs?: boolean
-    transactionStateDiffs?: boolean
+    include: {
+        transaction?: boolean
+        transactionTraces?: boolean
+        transactionLogs?: boolean
+        transactionStateDiffs?: boolean
+    }
 }
-
 
 export interface TransactionRequest {
     to?: Bytes20[]
     from?: Bytes20[]
     sighash?: Bytes[]
     type?: number[]
-    logs?: boolean
-    traces?: boolean
-    stateDiffs?: boolean
+    include: {
+        logs?: boolean
+        traces?: boolean
+        stateDiffs?: boolean
+    }
 }
-
 
 export interface TraceRequest {
     type?: string[]
@@ -55,16 +52,19 @@ export interface TraceRequest {
     callSighash?: Bytes[]
     suicideRefundAddress?: Bytes[]
     rewardAuthor?: Bytes20[]
-    transaction?: boolean
-    transactionLogs?: boolean
-    subtraces?: boolean
-    parents?: boolean
+    include: {
+        transaction?: boolean
+        transactionLogs?: boolean
+        subtraces?: boolean
+        parents?: boolean
+    }
 }
-
 
 export interface StateDiffRequest {
     address?: Bytes20[]
     key?: Bytes[]
-    kind?: EvmStateDiff['kind'][]
-    transaction?: boolean
+    kind?: string[]
+    include: {
+        transaction?: boolean
+    }
 }

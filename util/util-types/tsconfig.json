@@ -3,7 +3,7 @@
     "module": "commonjs",
     "target": "es2020",
     "outDir": "lib",
-    "rootDir": "src",
+    "rootDir": "types",
     "allowJs": true,
     "strict": true,
     "declaration": true,
@@ -14,8 +14,8 @@
     "emitDecoratorMetadata": true,
     "skipLibCheck": true
   },
-  "include": ["src"],
-  "exclude": [
-    "node_modules"
+  "files": [
+    "index.d.ts",
+    "./types/*.d.ts"
   ]
 }

@@ -8,7 +8,6 @@ import {
     TraceRequest,
     TransactionRequest,
 } from './interfaces/data-request'
-import {Bytes20} from './interfaces/base'
 
 export interface RequestOptions {
     range: Range
@@ -19,42 +18,9 @@ export interface TransactionRequestOptions extends TransactionRequest, RequestOp
 export interface TraceRequestOptions extends TraceRequest, RequestOptions {}
 export interface StateDiffRequestOptions extends StateDiffRequest, RequestOptions {}
 
-// export interface ContractRequestOptions extends RequestOptions {
-//     address: Bytes20[]
-//     logs: Omit<LogRequestOptions, 'address'>[]
-//     transactions: Omit<TransactionRequestOptions, 'to'>[]
-//     traces: Omit<TraceRequestOptions, 'callTo'>[]
-//     stateDiffs: Omit<StateDiffRequestOptions, 'address'>[]
-// }
-
-// export interface AccountRequestOptions extends RequestOptions {
-//     address: Bytes20[]
-//     transactions: (
-//         | Omit<TransactionRequestOptions, 'from' | 'to'>
-//         | {
-//               from: Omit<TransactionRequestOptions, 'from'>
-//               to?: Omit<TransactionRequestOptions, 'to'>
-//           }
-//         | {
-//               from?: Omit<TransactionRequestOptions, 'from'>
-//               to: Omit<TransactionRequestOptions, 'to'>
-//           }
-//     )[]
-//     traces: Omit<TraceRequestOptions, 'to'>[]
-//     stateDiffs: Omit<StateDiffRequestOptions, 'address'>[]
-// }
-
 export class EvmQueryBuilder {
     private range: Range = {from: 0}
     private ranges: EvmQueryRange[] = []
-
-    addContract(): this {
-        return this
-    }
-
-    addAccount(): this {
-        return this
-    }
 
     addLog(options: LogRequestOptions): this {
         this.ranges.push({
