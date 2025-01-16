@@ -1,7 +1,9 @@
 import {Range} from '@subsquid/util-internal-range'
 import type {Bytes, Bytes20, Bytes32} from '@subsquid/util-types'
+import {FieldSelection} from './response'
 
-export type EvmQuery = {
+export type EvmQuery<F extends FieldSelection> = {
+    fields: F
     ranges: EvmQueryRange[]
 }
 

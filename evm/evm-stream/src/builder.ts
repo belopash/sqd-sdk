@@ -7,7 +7,7 @@ import {
     StateDiffRequest,
     TraceRequest,
     TransactionRequest,
-} from './interfaces/data-request'
+} from './data/request'
 
 export interface RequestOptions {
     range: Range

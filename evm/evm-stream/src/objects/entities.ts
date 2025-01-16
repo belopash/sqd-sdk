@@ -1,5 +1,5 @@
 import assert from 'assert'
-import {
+import type {
     BlockFields,
     LogFields,
     StateDiffAddFields,
@@ -14,8 +14,8 @@ import {
     TraceSuicideFields,
     TransactionFields,
     TransactionReceiptFields,
-} from '../interfaces/evm'
-import type {Block, Log, Transaction, TransactionReceipt, TraceBase, StateDiffBase} from '../interfaces/data'
+} from '../data'
+import type {Block, Log, Transaction, TransactionReceipt, TraceBase, StateDiffBase} from '../data'
 
 export interface BlockEntity extends BlockFields {}
 export class BlockEntity implements Block {
@@ -320,7 +320,7 @@ class StateDiffBaseEntity implements StateDiffBase {
     set transaction(value: TransactionEntity | undefined) {
         this.#transaction = value
     }
-
+ 
     getTransaction(): TransactionEntity {
         assert(this.transaction != null)
         return this.transaction

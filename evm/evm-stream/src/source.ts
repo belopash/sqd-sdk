@@ -1,7 +1,7 @@
 import {applyRangeBound, Range} from '@subsquid/util-internal-range'
 import {PortalClient, PortalQuery, PortalStreamData} from '@subsquid/portal-client'
-import {EvmQuery} from './interfaces/data-request'
-import {BlockData} from './interfaces/data'
+import {EvmQuery} from './data/request'
+import {BlockData} from './data/response'
 import {assertNotNull, AsyncQueue, unexpectedCase, weakMemo} from '@subsquid/util-internal'
 import {
     array,
@@ -29,8 +29,8 @@ import {
     BlockEntity,
     StateDiffEntity,
     TraceEntity,
-} from './mapping/entities'
-import {setUpRelations} from './mapping/relations'
+} from './objects/entities'
+import {setUpRelations} from './objects/relations'
 import {
     getBlockHeaderProps,
     getTxProps,
@@ -38,7 +38,7 @@ import {
     getLogProps,
     getTraceFrameValidator,
     project,
-} from './mapping/schema'
+} from './objects/schema'
 import {FieldSelection} from '@subsquid/portal-client/lib/query/evm'
 
 export interface HashAndHeight {

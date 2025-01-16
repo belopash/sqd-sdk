@@ -21,7 +21,7 @@ import {
     TraceFields,
     TransactionFields,
     TransactionReceiptFields,
-} from '../interfaces/evm'
+} from '../data/fields'
 import {
     Block,
     BlockRequiredFields,
@@ -31,7 +31,7 @@ import {
     TraceRequiredFields,
     TransactionReceiptRequiredFields,
     TransactionRequiredFields,
-} from '../interfaces/data'
+} from '../data/response'
 
 export function setUpRelations<F extends FieldSelection>(data: {
     block: Pick<BlockFields, BlockRequiredFields>
