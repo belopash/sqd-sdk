@@ -8,6 +8,7 @@ async function main() {
         http: new HttpClient({
             retryAttempts: Infinity,
         }),
+        minBytes: 40 * 1024 * 1024,
     })
 
     // let query: Query = {t
@@ -41,7 +42,7 @@ async function main() {
     //     },
     // })
 
-    let fromBlock = await portal.getFinalizedHeight().then((h) => h - 1_000_000)
+    let fromBlock = await portal.getFinalizedHeight().then((h) => h - 100_000)
 
     let query = {
         type: 'evm',
@@ -64,9 +65,10 @@ async function main() {
                 topic0: ['0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef'],
             },
         ],
+        // includeAllBlocks: true,
     }
 
-    for await (let {blocks, finalizedHead} of portal.getFinalizedStream(query)) {
+    for await (let {blocks, finalizedHead} of portal.getFinalizedStream(query, {stopOnHead: true})) {
         console.log(
             `progress: ${blocks[blocks.length - 1].header.number} / ${finalizedHead.height}, ` +
                 `blocks: ${blocks.length}, `
