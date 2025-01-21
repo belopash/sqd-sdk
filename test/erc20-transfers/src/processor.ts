@@ -68,7 +68,8 @@ async function main() {
         // includeAllBlocks: true,
     }
 
-    for await (let {blocks, finalizedHead} of portal.getFinalizedStream(query, {stopOnHead: true})) {
+    let stream = portal.getFinalizedStream(query, {stopOnHead: true})
+    for await (let {blocks, finalizedHead} of stream) {
         console.log(
             `progress: ${blocks[blocks.length - 1].header.number} / ${finalizedHead.height}, ` +
                 `blocks: ${blocks.length}, `
@@ -77,6 +78,7 @@ async function main() {
 
         // break
     }
+    console.log(`end`)
 }
 
 main()

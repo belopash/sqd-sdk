@@ -136,7 +136,7 @@ export class PortalClient {
             stopOnHead = false,
         } = options ?? {}
 
-        return createRedablePortalStream<B>(
+        return createReadablePortalStream<B>(
             query,
             {
                 headPollInterval,
@@ -185,7 +185,7 @@ export class PortalClient {
     }
 }
 
-function createRedablePortalStream<B extends Block>(
+function createReadablePortalStream<B extends Block>(
     query: PortalQuery,
     options: Required<PortalStreamOptions>,
     requestStream: (
@@ -199,63 +199,70 @@ function createRedablePortalStream<B extends Block>(
     let abortStream = new AbortController()
 
     let buffer: {data: PortalStreamData<B>; bytes: number} | undefined
-    let isReady = false
-    let isClosed = false
+    let state: 'open' | 'failed' | 'closed' = 'open'
+    let error: unknown
 
-    let pullFuture: Future<void> | undefined
-    let putFuture: Future<void> | undefined
+    let readyFuture: Future<void> = createFuture()
+    let takeFuture: Future<void> = createFuture()
+    let putFuture: Future<void> = createFuture()
 
     let lastChunkTimestamp = Date.now()
     let idleInterval: ReturnType<typeof setInterval> | undefined
+    let waitTimeout: ReturnType<typeof setTimeout> | undefined
 
-    let lastPullTimestamp = Date.now()
-    let putTimeout: ReturnType<typeof setTimeout> | undefined
+    async function take() {
+        if (state === 'failed') {
+            throw error
+        }
 
-    async function waitPut() {
-        if (isClosed) return
-        if (isReady && buffer != null) return
-
-        createPutTimeout()
-
-        putFuture = putFuture || createFuture()
+        createWaitTimeout()
+        await readyFuture.promise()
         await putFuture.promise()
 
-        destroyPutTimeout()
-    }
+        let value = buffer?.data
+        buffer = undefined
+        takeFuture.resolve()
 
-    async function waitPull() {
-        if (isClosed) return
-        pullFuture = pullFuture || createFuture()
-        await pullFuture.promise()
-    }
+        if (state === 'closed') {
+            return {value, done: value == null}
+        } else {
+            takeFuture = createFuture()
+            putFuture = createFuture()
+            readyFuture = createFuture()
 
-    function ready() {
-        if (isReady) return
-        isReady = true
-        destroyIdleInterval()
-        destroyPutTimeout()
+            return {value, done: false}
+        }
     }
 
     function close() {
-        if (isClosed) return
-        isClosed = true
-        putFuture = putFuture?.resolve() ?? undefined
-        pullFuture = pullFuture?.resolve() ?? undefined
-        destroyIdleInterval()
-        destroyPutTimeout()
+        if (state !== 'open') return
+        state = 'closed'
+        readyFuture.resolve()
+        putFuture.resolve()
+        takeFuture.resolve()
+    }
+
+    function fail(err: unknown) {
+        if (state !== 'open') return
+        state = 'failed'
+        error = err
+        readyFuture.resolve()
+        putFuture.resolve()
+        takeFuture.resolve()
     }
 
     function createIdleInterval() {
         clearInterval(idleInterval)
 
+        let isTriggered = false
         idleInterval = setInterval(() => {
+            if (isTriggered) return
             if (Date.now() - lastChunkTimestamp >= maxIdleTime) {
-                ready()
-                if (buffer != null) {
-                    putFuture = putFuture?.resolve() ?? undefined
-                }
+                isTriggered = true
+                readyFuture.resolve()
             }
-        }, Math.ceil(maxIdleTime / 2))
+        }, Math.ceil(maxIdleTime / 3))
+        readyFuture.promise().finally(destroyIdleInterval)
     }
 
     function destroyIdleInterval() {
@@ -263,151 +270,148 @@ function createRedablePortalStream<B extends Block>(
         idleInterval = undefined
     }
 
-    function createPutTimeout() {
-        clearTimeout(putTimeout)
+    function createWaitTimeout() {
+        clearTimeout(waitTimeout)
 
-        let diff = Date.now() - lastPullTimestamp
-
-        putTimeout = setTimeout(() => {
-            ready()
-            if (buffer != null) {
-                putFuture = putFuture?.resolve() ?? undefined
-            }
-        }, maxWaitTime - diff)
+        waitTimeout = setTimeout(() => readyFuture.resolve(), maxWaitTime)
+        readyFuture.promise().finally(destroyWaitTimeout)
     }
 
-    function destroyPutTimeout() {
-        clearTimeout(putTimeout)
-        putTimeout = undefined
+    function destroyWaitTimeout() {
+        clearTimeout(waitTimeout)
+        waitTimeout = undefined
     }
 
     async function ingest() {
-        let reader: ReadableStreamDefaultReader<string[]> | undefined
-
-        function abort() {
-            reader?.cancel().catch(() => {})
-            pullFuture?.resolve()
-        }
-
         let abortSignal = abortStream.signal
-        abortSignal.addEventListener('abort', abort)
+        let {fromBlock, toBlock = Infinity} = query
 
         try {
-            let fromBlock = query.fromBlock
-            let toBlock = query.toBlock ?? Infinity
+            let reader: ReadableStreamDefaultReader<string[]> | undefined
 
-            while (true) {
-                if (abortSignal.aborted) break
-                if (fromBlock > toBlock) break
+            try {
+                while (true) {
+                    if (abortSignal.aborted) break
+                    if (fromBlock > toBlock) break
 
-                let res = await requestStream(
-                    {
-                        ...query,
-                        fromBlock,
-                    },
-                    {
-                        ...request,
-                        abort: abortSignal,
-                    }
-                )
+                    let res = await requestStream(
+                        {
+                            ...query,
+                            fromBlock,
+                        },
+                        {
+                            ...request,
+                            abort: abortSignal,
+                        }
+                    )
 
-                if (res == null) {
-                    if (stopOnHead) break
-                    await wait(headPollInterval, abortSignal)
-                } else {
-                    let {finalizedHead, stream} = res
-                    reader = stream.getReader()
+                    if (res == null) {
+                        if (stopOnHead) break
+                        await wait(headPollInterval, abortSignal)
+                    } else {
+                        let {finalizedHead, stream} = res
+                        reader = stream.getReader()
 
-                    while (true) {
-                        if (idleInterval == null && !isReady) {
+                        while (true) {
+                            let data = await withAbort(reader.read(), abortSignal)
+                            if (data.done) break
+                            if (data.value.length == 0) continue
+
                             lastChunkTimestamp = Date.now()
-                            createIdleInterval()
-                        }
-
-                        let data = await reader.read()
-                        if (data.done) break
-                        if (data.value.length == 0) continue
-
-                        lastChunkTimestamp = Date.now()
-
-                        if (buffer == null) {
-                            buffer = {
-                                data: {finalizedHead, blocks: []},
-                                bytes: 0,
+                            if (idleInterval == null) {
+                                createIdleInterval()
                             }
-                        } else {
-                            buffer.data.finalizedHead = finalizedHead
+
+                            if (buffer == null) {
+                                buffer = {
+                                    data: {finalizedHead, blocks: []},
+                                    bytes: 0,
+                                }
+                            } else {
+                                buffer.data.finalizedHead = finalizedHead
+                            }
+
+                            for (let line of data.value) {
+                                let block = JSON.parse(line) as B
+
+                                buffer.bytes += line.length
+                                buffer.data.blocks.push(block)
+
+                                fromBlock = block.header.number + 1
+                            }
+
+                            if (buffer.bytes >= minBytes) {
+                                readyFuture.resolve()
+                            }
+
+                            putFuture.resolve()
+
+                            if (buffer.bytes >= maxBytes) {
+                                await withAbort(takeFuture.promise(), abortSignal)
+                            }
                         }
 
-                        for (let line of data.value) {
-                            let block = JSON.parse(line) as B
-
-                            buffer.bytes += line.length
-                            buffer.data.blocks.push(block)
-
-                            fromBlock = block.header.number + 1
+                        destroyIdleInterval()
+                        if (buffer != null) {
+                            readyFuture.resolve()
                         }
-
-                        if (buffer.bytes >= minBytes) {
-                            ready()
-                        }
-
-                        if (isReady) {
-                            putFuture = putFuture?.resolve() ?? undefined
-                        }
-
-                        if (buffer.bytes >= maxBytes) {
-                            await waitPull()
-                        }
-                    }
-
-                    destroyIdleInterval()
-
-                    if (buffer != null) {
-                        ready()
-                        putFuture = putFuture?.resolve() ?? undefined
                     }
                 }
+            } catch (err) {
+                if (err instanceof HttpBodyTimeoutError) {
+                    // ignore
+                } else {
+                    throw err
+                }
+            } finally {
+                reader?.cancel().catch(() => {})
             }
         } catch (err) {
             if (abortSignal.aborted) {
                 // ignore
-            } else if (err instanceof HttpBodyTimeoutError) {
-                // ignore
             } else {
                 throw err
             }
-        } finally {
-            reader?.cancel().catch(() => {})
-            abortSignal.removeEventListener('abort', abort)
-            destroyIdleInterval()
         }
     }
 
     return new ReadableStream({
-        start(controller) {
-            ingest()
-                .catch((err) => controller.error(err))
-                .finally(() => close())
+        start() {
+            ingest().then(close, fail)
         },
         async pull(controller) {
-            await waitPut()
-
-            if (buffer != null) {
-                controller.enqueue(buffer.data)
-                isReady = false
-                buffer = undefined
-                pullFuture = pullFuture?.resolve() ?? undefined
-                lastPullTimestamp = Date.now()
-            }
-
-            if (isClosed) {
-                controller.close()
+            try {
+                let result = await take()
+                if (result.done) {
+                    controller.close()
+                } else {
+                    controller.enqueue(result.value)
+                }
+            } catch (err) {
+                controller.error(err)
             }
         },
         cancel(reason) {
             abortStream.abort(reason)
         },
+    })
+}
+
+function withAbort<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+        if (signal.aborted) {
+            reject(signal.reason || new Error('Aborted'))
+        }
+
+        const abort = () => {
+            reject(signal.reason || new Error('Aborted'))
+        }
+
+        signal.addEventListener('abort', abort)
+
+        promise.then(resolve, reject).finally(() => {
+            signal.removeEventListener('abort', abort)
+        })
     })
 }
 
