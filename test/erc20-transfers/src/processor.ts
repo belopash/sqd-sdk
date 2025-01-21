@@ -1,5 +1,6 @@
 import {PortalClient, PortalQuery, PortalResponse} from '@subsquid/portal-client'
 import {HttpClient} from '@subsquid/http-client'
+import {EvmQuery} from '@subsquid/portal-client/lib/query/evm'
 
 async function main() {
     let portal = new PortalClient({
@@ -45,15 +46,17 @@ async function main() {
                 topic0: ['0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef'],
             },
         ],
-    } satisfies PortalQuery
+    } satisfies EvmQuery
 
-    for await (let {blocks, finalizedHead} of portal.getFinalizedStream(query)) {
+    let stream = portal.getFinalizedStream(query, {stopOnHead: true})
+    for await (let {blocks, finalizedHead} of stream) {
         console.log(
             `progress: ${blocks[blocks.length - 1].header.number} / ${finalizedHead.number}, ` +
                 `blocks: ${blocks.length}, ` +
                 `logs: ${blocks.reduce((r, b) => (r += b.logs?.length || 0), 0)}`
         )
     }
+    console.log(`end`)
 }
 
 main()
