@@ -12,7 +12,7 @@ import type {
     Simplify,
 } from '@subsquid/util-types'
 
-type _BlockHeader = {
+type BlockHeaderFields = {
     number: number
     hash: Bytes32
     parentHash: Bytes32
@@ -37,7 +37,7 @@ type _BlockHeader = {
     l1BlockNumber?: number
 }
 
-type _Transaction = {
+type TransactionFields = {
     transactionIndex: number
     hash: Bytes32
     nonce: number
@@ -72,7 +72,7 @@ type _Transaction = {
     l1BaseFeeScalar?: number
 }
 
-type _Log = {
+type LogFields = {
     logIndex: number
     transactionIndex: number
     transactionHash: Bytes32
@@ -81,7 +81,7 @@ type _Log = {
     topics: Bytes32[]
 }
 
-type _TraceBase = {
+type TraceBaseFields = {
     type: string
     transactionIndex: number
     traceAddress: number[]
@@ -90,28 +90,28 @@ type _TraceBase = {
     revertReason?: string
 }
 
-type _TraceCreate = _TraceBase & {
+type TraceCreateFields = TraceBaseFields & {
     type: 'create'
 }
 
-type _TraceCreateAction = {
+type TraceCreateActionFields = {
     from: Bytes20
     value: bigint
     gas: bigint
     init: Bytes
 }
 
-type _TraceCreateResult = {
+type TraceCreateResultFields = {
     gasUsed: bigint
     code: Bytes
     address: Bytes20
 }
 
-type _TraceCall = _TraceBase & {
+type TraceCallFields = TraceBaseFields & {
     type: 'call'
 }
 
-type _TraceCallAction = {
+type TraceCallActionFields = {
     callType: string
     from: Bytes20
     to: Bytes20
@@ -121,32 +121,32 @@ type _TraceCallAction = {
     sighash: Bytes
 }
 
-type _TraceCallResult = {
+type TraceCallResultFields = {
     gasUsed: bigint
     output: Bytes
 }
 
-type _TraceSuicide = _TraceBase & {
+type TraceSuicideFields = TraceBaseFields & {
     type: 'suicide'
 }
 
-type _TraceSuicideAction = {
+type TraceSuicideActionFields = {
     address: Bytes20
     refundAddress: Bytes20
     balance: bigint
 }
 
-type _TraceReward = _TraceBase & {
+type TraceRewardFields = TraceBaseFields & {
     type: 'reward'
 }
 
-type _TraceRewardAction = {
+type TraceRewardActionFields = {
     author: Bytes20
     value: bigint
     type: string
 }
 
-type _StateDiffBase = {
+type StateDiffBaseFields = {
     transactionIndex: number
     address: Bytes20
     key: 'balance' | 'code' | 'nonce' | Bytes32
@@ -155,25 +155,25 @@ type _StateDiffBase = {
     next?: unknown
 }
 
-type _StateDiffAdd = _StateDiffBase & {
+type StateDiffAddFields = StateDiffBaseFields & {
     kind: '+'
     prev?: null
     next: Bytes
 }
 
-type _StateDiffNoChange = _StateDiffBase & {
+type StateDiffNoChangeFields = StateDiffBaseFields & {
     kind: '='
     prev?: null
     next?: null
 }
 
-type _StateDiffChange = _StateDiffBase & {
+type StateDiffChangeFields = StateDiffBaseFields & {
     kind: '*'
     prev: Bytes
     next: Bytes
 }
 
-type _StateDiffDelete = _StateDiffBase & {
+type StateDiffDeleteFields = StateDiffBaseFields & {
     kind: '-'
     prev: Bytes
     next?: null
@@ -182,93 +182,93 @@ type _StateDiffDelete = _StateDiffBase & {
 type Trues<T> = {[K in keyof T]-?: true}
 
 export type BlockHeaderFieldSelection = Simplify<
-    Selector<keyof _BlockHeader> & {
+    Selector<keyof BlockHeaderFields> & {
         hash: true
         number: true
     }
 >
 export type BlockHeader<T extends BlockHeaderFieldSelection = Trues<BlockHeaderFieldSelection>> = Simplify<
-    Select<_BlockHeader, T>
+    Select<BlockHeaderFields, T>
 >
 
-export type TransactionFieldSelection = Selector<keyof _Transaction>
+export type TransactionFieldSelection = Selector<keyof TransactionFields>
 export type Transaction<T extends TransactionFieldSelection = Trues<TransactionFieldSelection>> = Simplify<
-    Select<_Transaction, T>
+    Select<TransactionFields, T>
 >
 
-export type LogFieldSelection = Selector<keyof _Log>
-export type Log<T extends LogFieldSelection = Trues<LogFieldSelection>> = Simplify<Select<_Log, T>>
+export type LogFieldSelection = Selector<keyof LogFields>
+export type Log<T extends LogFieldSelection = Trues<LogFieldSelection>> = Simplify<Select<LogFields, T>>
 
 export type TraceFieldSelection = Selector<
-    | keyof _TraceBase
-    | AddPrefix<'create', keyof _TraceCreateAction>
-    | AddPrefix<'createResult', keyof _TraceCreateResult>
-    | AddPrefix<'call', keyof _TraceCallAction>
-    | AddPrefix<'callResult', keyof _TraceCallResult>
-    | AddPrefix<'suicide', keyof _TraceSuicideAction>
-    | AddPrefix<'reward', keyof _TraceRewardAction>
+    | keyof TraceBaseFields
+    | AddPrefix<'create', keyof TraceCreateActionFields>
+    | AddPrefix<'createResult', keyof TraceCreateResultFields>
+    | AddPrefix<'call', keyof TraceCallActionFields>
+    | AddPrefix<'callResult', keyof TraceCallResultFields>
+    | AddPrefix<'suicide', keyof TraceSuicideActionFields>
+    | AddPrefix<'reward', keyof TraceRewardActionFields>
 >
 
 export type TraceCreateAction<F extends TraceFieldSelection = Trues<TraceFieldSelection>> = Simplify<
-    Select<_TraceCreateAction, RemoveKeysPrefix<'create', F>>
+    Select<TraceCreateActionFields, RemoveKeysPrefix<'create', F>>
 >
 
 export type TraceCreateResult<F extends TraceFieldSelection = Trues<TraceFieldSelection>> = Simplify<
-    Select<_TraceCreateResult, RemoveKeysPrefix<'createResult', F>>
+    Select<TraceCreateResultFields, RemoveKeysPrefix<'createResult', F>>
 >
 
 export type TraceCallAction<F extends TraceFieldSelection = Trues<TraceFieldSelection>> = Simplify<
-    Select<_TraceCallAction, RemoveKeysPrefix<'call', F>>
+    Select<TraceCallActionFields, RemoveKeysPrefix<'call', F>>
 >
 
 export type TraceCallResult<F extends TraceFieldSelection = Trues<TraceFieldSelection>> = Simplify<
-    Select<_TraceCallResult, RemoveKeysPrefix<'callResult', F>>
+    Select<TraceCallResultFields, RemoveKeysPrefix<'callResult', F>>
 >
 
 export type TraceSuicideAction<F extends TraceFieldSelection = Trues<TraceFieldSelection>> = Simplify<
-    Select<_TraceSuicideAction, RemoveKeysPrefix<'suicide', F>>
+    Select<TraceSuicideActionFields, RemoveKeysPrefix<'suicide', F>>
 >
 
 export type TraceRewardAction<F extends TraceFieldSelection = Trues<TraceFieldSelection>> = Simplify<
-    Select<_TraceRewardAction, RemoveKeysPrefix<'reward', F>>
+    Select<TraceRewardActionFields, RemoveKeysPrefix<'reward', F>>
 >
 
 export type TraceCreate<F extends TraceFieldSelection = Trues<TraceFieldSelection>> = Simplify<
-    Select<_TraceCreate, F> & RemoveEmptyObjects<{action: TraceCreateAction<F>; result?: TraceCreateResult<F>}>
+    Select<TraceCreateFields, F> & RemoveEmptyObjects<{action: TraceCreateAction<F>; result?: TraceCreateResult<F>}>
 >
 
 export type TraceCall<F extends TraceFieldSelection = Trues<TraceFieldSelection>> = Simplify<
-    Select<_TraceCall, F> & RemoveEmptyObjects<{action: TraceCallAction<F>; result?: TraceCallResult<F>}>
+    Select<TraceCallFields, F> & RemoveEmptyObjects<{action: TraceCallAction<F>; result?: TraceCallResult<F>}>
 >
 
 export type TraceSuicide<F extends TraceFieldSelection = Trues<TraceFieldSelection>> = Simplify<
-    Select<_TraceSuicide, F> & RemoveEmptyObjects<{action: TraceSuicideAction<F>}>
+    Select<TraceSuicideFields, F> & RemoveEmptyObjects<{action: TraceSuicideAction<F>}>
 >
 
 export type TraceReward<F extends TraceFieldSelection = Trues<TraceFieldSelection>> = Simplify<
-    Select<_TraceReward, F> & RemoveEmptyObjects<{action: TraceRewardAction<F>}>
+    Select<TraceRewardFields, F> & RemoveEmptyObjects<{action: TraceRewardAction<F>}>
 >
 
 export type Trace<F extends TraceFieldSelection = Trues<TraceFieldSelection>> = F extends any
     ? TraceCreate<F> | TraceCall<F> | TraceSuicide<F> | TraceReward<F>
     : never
 
-export type StateDiffFieldSelection = Selector<keyof _StateDiffBase>
+export type StateDiffFieldSelection = Selector<keyof StateDiffBaseFields>
 
 export type StateDiffNoChange<F extends StateDiffFieldSelection = Trues<StateDiffFieldSelection>> = Simplify<
-    Select<_StateDiffNoChange, F>
+    Select<StateDiffNoChangeFields, F>
 >
 
 export type StateDiffAdd<F extends StateDiffFieldSelection = Trues<StateDiffFieldSelection>> = Simplify<
-    Select<_StateDiffAdd, F>
+    Select<StateDiffAddFields, F>
 >
 
 export type StateDiffChange<F extends StateDiffFieldSelection = Trues<StateDiffFieldSelection>> = Simplify<
-    Select<_StateDiffChange, F>
+    Select<StateDiffChangeFields, F>
 >
 
 export type StateDiffDelete<F extends StateDiffFieldSelection = Trues<StateDiffFieldSelection>> = Simplify<
-    Select<_StateDiffDelete, F>
+    Select<StateDiffDeleteFields, F>
 >
 
 export type StateDiff<F extends StateDiffFieldSelection = Trues<StateDiffFieldSelection>> = F extends any
@@ -283,7 +283,7 @@ export type FieldSelection = {
     stateDiff?: StateDiffFieldSelection
 }
 
-export type LogsRequest = {
+export type LogRequest = {
     address?: Bytes20[]
     topic0?: Bytes32[]
     topic1?: Bytes32[]
@@ -326,22 +326,29 @@ export type StateDiffRequest = {
     transaction?: boolean
 }
 
-export type EvmQuery = Simplify<{
-    type: 'evm'
-    fromBlock?: number
-    toBlock?: number
-    fields: FieldSelection
-    logs?: LogsRequest[]
+export type DataRequest = {
+    logs?: LogRequest[]
     transactions?: TransactionRequest[]
     traces?: TraceRequest[]
     stateDiffs?: StateDiffRequest[]
     includeAllBlocks?: boolean
+}
+
+export type EvmQuery = Simplify<
+    {
+        type: 'evm'
+        fromBlock?: number
+        toBlock?: number
+        fields: FieldSelection
+    } & DataRequest
+>
+
+export type BlockData<F extends FieldSelection> = Simplify<{
+    header: BlockHeader<F['block']>
+    logs?: Log<ExcludeUndefined<F['log']>>[]
+    transactions?: Transaction<ExcludeUndefined<F['transaction']>>[]
+    traces?: Trace<ExcludeUndefined<F['trace']>>[]
+    stateDiffs?: StateDiff<ExcludeUndefined<F['stateDiff']>>[]
 }>
 
-export type EvmResponse<Q extends EvmQuery> = Simplify<{
-    header: BlockHeader<Q['fields']['block']>
-    logs?: Log<ExcludeUndefined<Q['fields']['log']>>[]
-    transactions?: Transaction<ExcludeUndefined<Q['fields']['transaction']>>[]
-    traces?: Trace<ExcludeUndefined<Q['fields']['trace']>>[]
-    stateDiffs?: StateDiff<ExcludeUndefined<Q['fields']['stateDiff']>>[]
-}>
+export type EvmResponse<Q extends EvmQuery> = BlockData<Q['fields']>

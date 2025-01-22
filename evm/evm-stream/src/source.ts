@@ -1,8 +1,6 @@
 import {applyRangeBound, Range} from '@subsquid/util-internal-range'
-import {PortalClient, PortalQuery, PortalStreamData} from '@subsquid/portal-client'
-import {EvmQuery} from './interfaces/data-request'
-import {BlockData} from './interfaces/data'
-import {assertNotNull, AsyncQueue, unexpectedCase, weakMemo} from '@subsquid/util-internal'
+import {PortalClient, PortalStreamData} from '@subsquid/portal-client'
+import {AsyncQueue, weakMemo} from '@subsquid/util-internal'
 import {
     array,
     BYTES,
@@ -15,23 +13,6 @@ import {
     withDefault,
 } from '@subsquid/util-internal-validation'
 import {
-    BlockEntity,
-    TransactionEntity,
-    Log,
-    TraceCreateEntity,
-    TraceCallEntity,
-    TraceSuicideEntity,
-    TraceRewardEntity,
-    StateDiffNoChangeEntity,
-    StateDiffAddEntity,
-    StateDiffChangeEntity,
-    StateDiffDeleteEntity,
-    BlockEntity,
-    StateDiffEntity,
-    TraceEntity,
-} from './mapping/entities'
-import {setUpRelations} from './mapping/relations'
-import {
     getBlockHeaderProps,
     getTxProps,
     getTxReceiptProps,
@@ -39,44 +20,42 @@ import {
     getTraceFrameValidator,
     project,
 } from './mapping/schema'
-import {FieldSelection} from '@subsquid/portal-client/lib/query/evm'
+import {BlockData, FieldSelection} from '@subsquid/portal-client/lib/query/evm'
+import {EvmQueryOptions} from './builder'
 
-export interface HashAndHeight {
+export interface HashAndNumber {
     hash: string
-    height: number
+    number: number
 }
 
-export interface StreamData<Block> {
-    finalizedHead: HashAndHeight
-    rolledbackHeads: HashAndHeight[]
-    blocks: Block[]
+export interface StreamData<B> {
+    finalizedHead: HashAndNumber
+    rollbackHeads: HashAndNumber[]
+    blocks: B[]
 }
 
-export interface DataSource<Block> {
+export interface DataSource<B> {
     getHeight(): Promise<number>
     getFinalizedHeight(): Promise<number>
-    getBlockStream(range?: Range): ReadableStream<Block>
+    getBlockStream(range?: Range): ReadableStream<B>
 }
 
 export type GetDataSourceBlock<T> = T extends DataSource<infer B> ? B : never
 
-export interface EvmPortalDataSourceOptions<Fields extends FieldSelection> {
+export interface EvmPortalDataSourceOptions<F extends FieldSelection> {
     portal: string | PortalClient
-    query: EvmQuery
-    fields: Fields
+    query: EvmQueryOptions<F>
 }
 
-export class EvmPortalDataSource<Fields extends FieldSelection, Block extends BlockData<Fields> = BlockData<Fields>>
-    implements DataSource<StreamData<Block>>
+export class EvmPortalDataSource<F extends FieldSelection, B extends BlockData<F> = BlockData<F>>
+    implements DataSource<StreamData<B>>
 {
     private portal: PortalClient
-    private query: EvmQuery
-    private fields: Fields
+    private query: EvmQueryOptions<F>
 
-    constructor(options: EvmPortalDataSourceOptions<Fields>) {
+    constructor(options: EvmPortalDataSourceOptions<F>) {
         this.portal = typeof options.portal === 'string' ? new PortalClient({url: options.portal}) : options.portal
         this.query = options.query
-        this.fields = options.fields
     }
 
     getHeight(): Promise<number> {
@@ -87,12 +66,13 @@ export class EvmPortalDataSource<Fields extends FieldSelection, Block extends Bl
         return this.portal.getFinalizedHeight()
     }
 
-    getBlockStream(range?: Range): ReadableStream<StreamData<Block>> {
-        let queue = new AsyncQueue<StreamData<Block>>(1)
+    getBlockStream(range?: Range, stopOnHead?: boolean): ReadableStream<StreamData<B>> {
+        let queue = new AsyncQueue<StreamData<B>>(1)
         let ac = new AbortController()
 
         const ingest = async () => {
-            let query = applyRangeBound(this.query.ranges, range)
+            let requests = applyRangeBound(this.query.requests, range)
+            let fields = getFields(this.query.fields)
 
             function abort() {
                 reader?.cancel()
@@ -102,36 +82,32 @@ export class EvmPortalDataSource<Fields extends FieldSelection, Block extends Bl
 
             let reader: ReadableStreamDefaultReader<PortalStreamData<any>> | undefined
             try {
-                for (let queryRange of query) {
-                    let request = {
+                for (let request of requests) {
+                    let query = {
                         type: 'evm',
-                        fromBlock: queryRange.range.from,
-                        toBlock: queryRange.range.to,
-                        fields: this.fields,
-                        ...queryRange.request,
-                    } satisfies PortalQuery
+                        fromBlock: request.range.from,
+                        toBlock: request.range.to,
+                        fields,
+                        ...request.request,
+                    }
 
-                    reader = this.portal.getFinalizedStream(request).getReader()
+                    reader = this.portal.getFinalizedStream(query, {stopOnHead}).getReader()
 
                     while (true) {
                         let data = await reader.read()
                         if (data.done) break
 
-                        let blocks = data.value.blocks.map((b) => mapBlock(b, this.fields) as unknown as Block)
+                        let blocks = data.value.blocks.map((b) => mapBlock(b, fields) as unknown as B)
 
                         await queue.put({
-                            finalizedHead: {
-                                hash: data.value.finalizedHead.hash,
-                                height: data.value.finalizedHead.number,
-                            },
+                            finalizedHead: data.value.finalizedHead,
                             blocks,
-                            rolledbackHeads: [],
+                            rollbackHeads: [],
                         })
                     }
                 }
             } finally {
-                ac.signal.removeEventListener('abort', abort)
-                reader?.cancel()
+                reader?.cancel().catch(() => {})
             }
         }
 
@@ -162,7 +138,7 @@ export class EvmPortalDataSource<Fields extends FieldSelection, Block extends Bl
     }
 }
 
-export const getBlockValidator = weakMemo((fields: FieldSelection) => {
+export const getBlockValidator = weakMemo(<F extends FieldSelection>(fields: F) => {
     let BlockHeader = object(getBlockHeaderProps(fields.block, true))
 
     let Transaction = object({
@@ -198,87 +174,125 @@ export const getBlockValidator = weakMemo((fields: FieldSelection) => {
     })
 })
 
-export function mapBlock(rawBlock: unknown, fields: FieldSelection): BlockEntity {
+export function mapBlock<F extends FieldSelection, B extends BlockData<F> = BlockData<F>>(
+    rawBlock: unknown,
+    fields: F
+): B {
     let validator = getBlockValidator(fields)
 
-    let src = cast(validator, rawBlock)
+    let block = cast(validator, rawBlock)
 
-    let {number, hash, parentHash, ...hdr} = src.header
-    if (hdr.timestamp) {
-        hdr.timestamp = hdr.timestamp * 1000 // convert to ms
-    }
+    // let {number, hash, parentHash, ...hdr} = src.header
+    // if (hdr.timestamp) {
+    //     hdr.timestamp = hdr.timestamp * 1000 // convert to ms
+    // }
 
-    let header = new BlockEntity(number, hash, parentHash)
-    Object.assign(header, hdr)
+    // let header = new BlockHeader(number, hash, parentHash)
+    // Object.assign(header, hdr)
 
-    let block = new BlockEntity(header)
+    // let block = new Block(header)
 
-    if (src.transactions) {
-        for (let {transactionIndex, ...props} of src.transactions) {
-            let tx = new TransactionEntity(header, transactionIndex)
-            Object.assign(tx, props)
-            block.transactions.push(tx)
-        }
-    }
+    // if (src.transactions) {
+    //     for (let {transactionIndex, ...props} of src.transactions) {
+    //         let tx = new Transaction(header, transactionIndex)
+    //         Object.assign(tx, props)
+    //         block.transactions.push(tx)
+    //     }
+    // }
 
-    if (src.logs) {
-        for (let {logIndex, transactionIndex, ...props} of src.logs) {
-            let log = new Log(header, logIndex, transactionIndex)
-            Object.assign(log, props)
-            block.logs.push(log)
-        }
-    }
+    // if (src.logs) {
+    //     for (let {logIndex, transactionIndex, ...props} of src.logs) {
+    //         let log = new Log(header, logIndex, transactionIndex)
+    //         Object.assign(log, props)
+    //         block.logs.push(log)
+    //     }
+    // }
 
-    if (src.traces) {
-        for (let {transactionIndex, traceAddress, type, ...props} of src.traces) {
-            transactionIndex = assertNotNull(transactionIndex)
-            let trace: TraceEntity
-            switch (type) {
-                case 'create':
-                    trace = new TraceCreateEntity(header, transactionIndex, traceAddress)
-                    break
-                case 'call':
-                    trace = new TraceCallEntity(header, transactionIndex, traceAddress)
-                    break
-                case 'suicide':
-                    trace = new TraceSuicideEntity(header, transactionIndex, traceAddress)
-                    break
-                case 'reward':
-                    trace = new TraceRewardEntity(header, transactionIndex, traceAddress)
-                    break
-                default:
-                    throw unexpectedCase()
-            }
-            Object.assign(trace, props)
-            block.traces.push(trace)
-        }
-    }
+    // if (src.traces) {
+    //     for (let {transactionIndex, traceAddress, type, ...props} of src.traces) {
+    //         transactionIndex = assertNotNull(transactionIndex)
+    //         let trace: Trace
+    //         switch (type) {
+    //             case 'create':
+    //                 trace = new TraceCreate(header, transactionIndex, traceAddress)
+    //                 break
+    //             case 'call':
+    //                 trace = new TraceCall(header, transactionIndex, traceAddress)
+    //                 break
+    //             case 'suicide':
+    //                 trace = new TraceSuicide(header, transactionIndex, traceAddress)
+    //                 break
+    //             case 'reward':
+    //                 trace = new TraceReward(header, transactionIndex, traceAddress)
+    //                 break
+    //             default:
+    //                 throw unexpectedCase()
+    //         }
+    //         Object.assign(trace, props)
+    //         block.traces.push(trace)
+    //     }
+    // }
 
-    if (src.stateDiffs) {
-        for (let {transactionIndex, address, key, kind, ...props} of src.stateDiffs) {
-            let diff: StateDiffEntity
-            switch (kind) {
-                case '=':
-                    diff = new StateDiffNoChangeEntity(header, transactionIndex, address, key)
-                    break
-                case '+':
-                    diff = new StateDiffAddEntity(header, transactionIndex, address, key)
-                    break
-                case '*':
-                    diff = new StateDiffChangeEntity(header, transactionIndex, address, key)
-                    break
-                case '-':
-                    diff = new StateDiffDeleteEntity(header, transactionIndex, address, key)
-                    break
-                default:
-                    throw unexpectedCase()
-            }
-            Object.assign(diff, props)
-            block.stateDiffs.push(diff)
-        }
-    }
+    // if (src.stateDiffs) {
+    //     for (let {transactionIndex, address, key, kind, ...props} of src.stateDiffs) {
+    //         let diff: StateDiff
+    //         switch (kind) {
+    //             case '=':
+    //                 diff = new StateDiffNoChange(header, transactionIndex, address, key)
+    //                 break
+    //             case '+':
+    //                 diff = new StateDiffAdd(header, transactionIndex, address, key)
+    //                 break
+    //             case '*':
+    //                 diff = new StateDiffChange(header, transactionIndex, address, key)
+    //                 break
+    //             case '-':
+    //                 diff = new StateDiffDelete(header, transactionIndex, address, key)
+    //                 break
+    //             default:
+    //                 throw unexpectedCase()
+    //         }
+    //         Object.assign(diff, props)
+    //         block.stateDiffs.push(diff)
+    //     }
+    // }
 
-    setUpRelations(block)
+    // setUpRelations(block)
 
-    return block
+    return block as unknown as B
 }
+
+function getFields(fields?: FieldSelection): FieldSelection {
+    return {
+        block: {...fields?.block, ...ALWAYS_SELECTED_FIELDS.block},
+        transaction: {...fields?.transaction, ...ALWAYS_SELECTED_FIELDS.transaction},
+        log: {...fields?.log, ...ALWAYS_SELECTED_FIELDS.log},
+        trace: {...fields?.trace, ...ALWAYS_SELECTED_FIELDS.trace},
+        stateDiff: {...fields?.stateDiff, ...ALWAYS_SELECTED_FIELDS.stateDiff, kind: true},
+    }
+}
+
+const ALWAYS_SELECTED_FIELDS = {
+    block: {
+        number: true,
+        hash: true,
+        parentHash: true,
+    },
+    transaction: {
+        transactionIndex: true,
+    },
+    log: {
+        logIndex: true,
+        transactionIndex: true,
+    },
+    trace: {
+        transactionIndex: true,
+        traceAddress: true,
+        type: true,
+    },
+    stateDiff: {
+        transactionIndex: true,
+        address: true,
+        key: true,
+    },
+} as const

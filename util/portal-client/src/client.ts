@@ -1,11 +1,8 @@
 import {HttpClient, HttpBodyTimeoutError} from '@subsquid/http-client'
 import {createFuture, Future, unexpectedCase, wait, withErrorContext} from '@subsquid/util-internal'
+import {HashAndNumber, PortalQuery, PortalResponse} from './query'
 
-export type PortalQuery = EvmQuery
-
-export type PortalResponse<Q extends PortalQuery> = Q extends EvmQuery ? EvmResponse<Q> : any
-
-export type PortalClientOptions = {
+export interface PortalClientOptions {
     url: string
     http?: HttpClient
 
@@ -17,7 +14,7 @@ export type PortalClientOptions = {
     headPollInterval?: number
 }
 
-export type PortalRequestOptions = {
+export interface PortalRequestOptions {
     headers?: HeadersInit
     retryAttempts?: number
     retrySchedule?: number[]
@@ -26,7 +23,7 @@ export type PortalRequestOptions = {
     abort?: AbortSignal
 }
 
-export type PortalStreamOptions = {
+export interface PortalStreamOptions {
     request?: Omit<PortalRequestOptions, 'abort'>
 
     minBytes?: number
@@ -39,14 +36,9 @@ export type PortalStreamOptions = {
     stopOnHead?: boolean
 }
 
-export interface PortalStreamData<B extends Block> {
-    finalizedHead: HashAndHeight
+export interface PortalStreamData<B> {
+    finalizedHead: HashAndNumber
     blocks: B[]
-}
-
-export interface PortalStreamDataRaw {
-    finalizedHead: HashAndHeight
-    blocks: string[]
 }
 
 export class PortalClient {
@@ -84,7 +76,7 @@ export class PortalClient {
         return height
     }
 
-    getFinalizedQuery<Q extends PortalQuery, R extends PortalResponse<Q>>(
+    getFinalizedQuery<Q extends PortalQuery = PortalQuery, R extends PortalResponse<Q> = PortalResponse<Q>>(
         query: Q,
         options?: PortalRequestOptions
     ): Promise<R[]> {
@@ -109,10 +101,10 @@ export class PortalClient {
             })
     }
 
-    getFinalizedStream<Q extends PortalQuery, R extends PortalResponse<Q> = PortalResponse<Q>>(
+    getFinalizedStream<Q extends PortalQuery = PortalQuery, R extends PortalResponse<Q> = PortalResponse<Q>>(
         query: Q,
         options?: PortalStreamOptions
-    ): ReadableStream<PortalStreamData<B>> {
+    ): ReadableStream<PortalStreamData<R>> {
         let {
             headPollInterval = this.headPollInterval,
             minBytes = this.minBytes,
@@ -123,7 +115,7 @@ export class PortalClient {
             stopOnHead = false,
         } = options ?? {}
 
-        return createReadablePortalStream<B>(
+        return createReadablePortalStream(
             query,
             {
                 headPollInterval,
@@ -138,7 +130,7 @@ export class PortalClient {
                 // NOTE: we emulate the same behaviour as will be implemented for hot blocks stream,
                 // but unfortunately we don't have any information about finalized block hash at the moment
                 let finalizedHead = {
-                    height: await this.getFinalizedHeight(options),
+                    number: await this.getFinalizedHeight(options),
                     hash: '',
                 }
 
@@ -172,20 +164,23 @@ export class PortalClient {
     }
 }
 
-function createReadablePortalStream<B extends Block>(
-    query: PortalQuery,
+function createReadablePortalStream<
+    Q extends PortalQuery = PortalQuery,
+    R extends PortalResponse<Q> = PortalResponse<Q>
+>(
+    query: Q,
     options: Required<PortalStreamOptions>,
     requestStream: (
-        query: PortalQuery,
+        query: Q,
         options?: PortalRequestOptions
-    ) => Promise<{finalizedHead: HashAndHeight; stream: ReadableStream<string[]>} | undefined>
-): ReadableStream<PortalStreamData<B>> {
+    ) => Promise<{finalizedHead: HashAndNumber; stream: ReadableStream<string[]>} | undefined>
+): ReadableStream<PortalStreamData<R>> {
     let {headPollInterval, stopOnHead, maxBytes, minBytes, request, maxIdleTime, maxWaitTime} = options
     maxBytes = Math.max(maxBytes, minBytes)
 
     let abortStream = new AbortController()
 
-    let buffer: {data: PortalStreamData<B>; bytes: number} | undefined
+    let buffer: {data: PortalStreamData<R>; bytes: number} | undefined
     let state: 'open' | 'failed' | 'closed' = 'open'
     let error: unknown
 
@@ -271,7 +266,7 @@ function createReadablePortalStream<B extends Block>(
 
     async function ingest() {
         let abortSignal = abortStream.signal
-        let {fromBlock, toBlock = Infinity} = query
+        let {fromBlock = 0, toBlock = Infinity} = query
 
         try {
             let reader: ReadableStreamDefaultReader<string[]> | undefined
@@ -319,7 +314,7 @@ function createReadablePortalStream<B extends Block>(
                             }
 
                             for (let line of data.value) {
-                                let block = JSON.parse(line) as B
+                                let block = JSON.parse(line) as R
 
                                 buffer.bytes += line.length
                                 buffer.data.blocks.push(block)

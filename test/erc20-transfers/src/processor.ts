@@ -1,22 +1,18 @@
-import {PortalClient, PortalQuery, PortalResponse} from '@subsquid/portal-client'
+import {PortalClient} from '@subsquid/portal-client'
 import {HttpClient} from '@subsquid/http-client'
-import {EvmQuery} from '@subsquid/portal-client/lib/query/evm'
+import {EvmPortalDataSource} from '@subsquid/evm-stream'
+import {EvmQueryBuilder} from '@subsquid/evm-stream/lib/builder'
 
 async function main() {
     let portal = new PortalClient({
         url: 'https://portal.sqd.dev/datasets/ethereum-mainnet',
         http: new HttpClient({
             retryAttempts: Infinity,
-            // bodyTimeout: 10
         }),
     })
 
-    let fromBlock = await portal.getFinalizedHeight().then((h) => h - 1_000_000)
-
-    let query = {
-        type: 'evm',
-        fromBlock,
-        fields: {
+    let query = new EvmQueryBuilder()
+        .setFields({
             block: {
                 number: true,
                 hash: true,
@@ -39,17 +35,23 @@ async function main() {
                 next: true,
                 prev: true,
             },
-        },
-        logs: [
-            {
+        })
+        .addLog({
+            request: {
                 address: ['0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48'],
                 topic0: ['0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef'],
             },
-        ],
-    } satisfies EvmQuery
+        })
+        .build()
 
-    let stream = portal.getFinalizedStream(query, {stopOnHead: true})
-    for await (let {blocks, finalizedHead} of stream) {
+    let dataSource = new EvmPortalDataSource({
+        portal,
+        query,
+    })
+
+    let from = await dataSource.getFinalizedHeight().then((h) => h - 1_000_000)
+
+    for await (let {blocks, finalizedHead} of dataSource.getBlockStream({from}, true)) {
         console.log(
             `progress: ${blocks[blocks.length - 1].header.number} / ${finalizedHead.number}, ` +
                 `blocks: ${blocks.length}, ` +

@@ -1,30 +1,34 @@
-import {applyRangeBound, mergeRangeRequests, Range} from '@subsquid/util-internal-range'
 import {
     DataRequest,
-    EvmQuery,
-    EvmQueryRange,
+    FieldSelection,
     LogRequest,
     StateDiffRequest,
     TraceRequest,
     TransactionRequest,
-} from './interfaces/data-request'
+} from '@subsquid/portal-client/lib/query/evm'
+import {applyRangeBound, mergeRangeRequests, Range, RangeRequest} from '@subsquid/util-internal-range'
 
-export interface RequestOptions {
-    range: Range
+export type RangeRequestOptions<R> = {range?: Range; request: R}
+export type LogRequestOptions = RangeRequestOptions<LogRequest>
+export type TransactionRequestOptions = RangeRequestOptions<TransactionRequest>
+export type TraceRequestOptions = RangeRequestOptions<TraceRequest>
+export type StateDiffRequestOptions = RangeRequestOptions<StateDiffRequest>
+
+export type EvmQueryOptions<F extends FieldSelection> = {
+    fields: F
+    requests: RangeRequest<DataRequest>[]
 }
 
-export interface LogRequestOptions extends LogRequest, RequestOptions {}
-export interface TransactionRequestOptions extends TransactionRequest, RequestOptions {}
-export interface TraceRequestOptions extends TraceRequest, RequestOptions {}
-export interface StateDiffRequestOptions extends StateDiffRequest, RequestOptions {}
-
-export class EvmQueryBuilder {
+export class EvmQueryBuilder<F extends FieldSelection = {block: {number: true; hash: true}}> {
     private range: Range = {from: 0}
-    private ranges: EvmQueryRange[] = []
+    private requests: RangeRequest<DataRequest>[] = []
+    private fields: F = {
+        block: {number: true, hash: true},
+    } as F
 
     addLog(options: LogRequestOptions): this {
-        this.ranges.push({
-            range: options.range,
+        this.requests.push({
+            range: options.range ?? {from: 0},
             request: {
                 logs: [mapRequest(options)],
             },
@@ -33,8 +37,8 @@ export class EvmQueryBuilder {
     }
 
     addTransaction(options: TransactionRequestOptions): this {
-        this.ranges.push({
-            range: options.range,
+        this.requests.push({
+            range: options.range ?? {from: 0},
             request: {
                 transactions: [mapRequest(options)],
             },
@@ -43,8 +47,8 @@ export class EvmQueryBuilder {
     }
 
     addTrace(options: TraceRequestOptions): this {
-        this.ranges.push({
-            range: options.range,
+        this.requests.push({
+            range: options.range ?? {from: 0},
             request: {
                 traces: [mapRequest(options)],
             },
@@ -53,8 +57,8 @@ export class EvmQueryBuilder {
     }
 
     addStateDiff(options: StateDiffRequestOptions): this {
-        this.ranges.push({
-            range: options.range,
+        this.requests.push({
+            range: options.range ?? {from: 0},
             request: {
                 stateDiffs: [mapRequest(options)],
             },
@@ -67,8 +71,13 @@ export class EvmQueryBuilder {
         return this
     }
 
-    build(): EvmQuery {
-        let ranges = mergeRangeRequests(this.ranges, (a, b) => {
+    setFields<F extends FieldSelection>(fields: F): EvmQueryBuilder<F> {
+        this.fields = fields as any
+        return this as any
+    }
+
+    build(): EvmQueryOptions<F> {
+        let requests = mergeRangeRequests(this.requests, (a, b) => {
             let res: DataRequest = {}
             res.transactions = concatRequestLists(a.transactions, b.transactions)
             res.logs = concatRequestLists(a.logs, b.logs)
@@ -81,7 +90,8 @@ export class EvmQueryBuilder {
         })
 
         return {
-            ranges: applyRangeBound(ranges, this.range),
+            fields: this.fields,
+            requests: applyRangeBound(requests, this.range),
         }
     }
 }
@@ -97,7 +107,8 @@ function concatRequestLists<T extends object>(a?: T[], b?: T[]): T[] | undefined
     return result.length == 0 ? undefined : result
 }
 
-function mapRequest<T extends RequestOptions>(req: T): Omit<T, 'range'> {
+function mapRequest<T>(options: RangeRequestOptions<T>): T {
+    let req = {...options.request}
     for (let key in req) {
         let val = (req as any)[key]
         if (Array.isArray(val)) {

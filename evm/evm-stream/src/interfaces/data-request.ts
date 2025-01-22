@@ -52,12 +52,10 @@ export interface TraceRequest {
     callSighash?: Bytes[]
     suicideRefundAddress?: Bytes[]
     rewardAuthor?: Bytes20[]
-    include: {
-        transaction?: boolean
-        transactionLogs?: boolean
-        subtraces?: boolean
-        parents?: boolean
-    }
+    transaction?: boolean
+    transactionLogs?: boolean
+    subtraces?: boolean
+    parents?: boolean
 }
 
 export interface StateDiffRequest {
