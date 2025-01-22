@@ -1,0 +1,17 @@
+{
+  "name": "@subsquid/util-types",
+  "version": "0.0.0",
+  "description": "xxhash function",
+  "license": "GPL-3.0-or-later",
+  "repository": "git@github.com:subsquid/squid.git",
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": ""
+  },
+  "devDependencies": {
+    "@types/node": "^18.18.14",
+    "typescript": "~5.5.4"
+  }
+}

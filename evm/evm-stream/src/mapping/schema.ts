@@ -1,9 +1,10 @@
-import {FieldSelection} from '../interfaces/data'
+import {FieldSelection} from '@subsquid/portal-client/lib/query/evm'
 import {
     array,
     BYTES,
     NAT,
     object,
+    oneOf,
     option,
     QTY,
     SMALL_QTY,
@@ -11,9 +12,8 @@ import {
     STRING_FLOAT,
     taggedUnion,
     withDefault,
-    withSentinel
+    withSentinel,
 } from '@subsquid/util-internal-validation'
-
 
 export function getBlockHeaderProps(fields: FieldSelection['block'], forArchive: boolean) {
     let natural = forArchive ? NAT : SMALL_QTY
@@ -39,10 +39,9 @@ export function getBlockHeaderProps(fields: FieldSelection['block'], forArchive:
             baseFeePerGas: withSentinel('BlockHeader.baseFeePerGas', -1n, QTY),
             timestamp: withSentinel('BlockHeader.timestamp', 0, natural),
             l1BlockNumber: withDefault(0, natural),
-    })
+        }),
     }
 }
-
 
 export function getTxProps(fields: FieldSelection['transaction'], forArchive: boolean) {
     let natural = forArchive ? NAT : SMALL_QTY
@@ -75,10 +74,9 @@ export function getTxProps(fields: FieldSelection['transaction'], forArchive: bo
             yParity: option(natural),
             chainId: option(natural),
             authorizationList: option(array(Authorization)),
-        })
+        }),
     }
 }
-
 
 export function getTxReceiptProps(fields: FieldSelection['transaction'], forArchive: boolean) {
     let natural = forArchive ? NAT : SMALL_QTY
@@ -99,7 +97,6 @@ export function getTxReceiptProps(fields: FieldSelection['transaction'], forArch
     })
 }
 
-
 export function getLogProps(fields: FieldSelection['log'], forArchive: boolean) {
     let natural = forArchive ? NAT : SMALL_QTY
     return {
@@ -109,11 +106,10 @@ export function getLogProps(fields: FieldSelection['log'], forArchive: boolean) 
             transactionHash: BYTES,
             address: BYTES,
             data: BYTES,
-            topics: array(BYTES)
-        })
+            topics: array(BYTES),
+        }),
     }
 }
-
 
 export function getTraceFrameValidator(fields: FieldSelection['trace'], forArchive: boolean) {
     let traceBase = {
@@ -122,108 +118,125 @@ export function getTraceFrameValidator(fields: FieldSelection['trace'], forArchi
         ...project(fields, {
             subtraces: NAT,
             error: option(STRING),
-            revertReason: option(STRING)
-        })
+            revertReason: option(STRING),
+        }),
     }
 
-    let traceCreateAction = project({
-        from: fields?.createFrom || !forArchive,
-        value: fields?.createValue,
-        gas: fields?.createGas,
-        init: fields?.createInit
-    }, {
-        from: BYTES,
-        value: QTY,
-        gas: QTY,
-        init: withDefault('0x', BYTES),
-    })
+    let traceCreateAction = project(
+        {
+            from: fields?.createFrom || !forArchive,
+            value: fields?.createValue,
+            gas: fields?.createGas,
+            init: fields?.createInit,
+        },
+        {
+            from: BYTES,
+            value: QTY,
+            gas: QTY,
+            init: withDefault('0x', BYTES),
+        }
+    )
 
-    let traceCreateResult = project({
-        gasUsed: fields?.createResultGasUsed,
-        code: fields?.createResultCode,
-        address: fields?.createResultAddress
-    }, {
-        gasUsed: QTY,
-        code: withDefault('0x', BYTES),
-        address: withDefault('0x0000000000000000000000000000000000000000', BYTES)
-    })
+    let traceCreateResult = project(
+        {
+            gasUsed: fields?.createResultGasUsed,
+            code: fields?.createResultCode,
+            address: fields?.createResultAddress,
+        },
+        {
+            gasUsed: QTY,
+            code: withDefault('0x', BYTES),
+            address: withDefault('0x0000000000000000000000000000000000000000', BYTES),
+        }
+    )
 
     let TraceCreate = object({
         ...traceBase,
         action: isEmpty(traceCreateAction) ? undefined : object(traceCreateAction),
-        result: isEmpty(traceCreateResult) ? undefined : option(object(traceCreateResult))
+        result: isEmpty(traceCreateResult) ? undefined : option(object(traceCreateResult)),
     })
 
-    let traceCallAction = project({
-        callType: fields?.callCallType,
-        from: forArchive ? fields?.callFrom : true,
-        to: forArchive ? fields?.callTo : true,
-        value: fields?.callValue,
-        gas: fields?.callGas,
-        input: forArchive ? fields?.callInput : true,
-        sighash: forArchive ? fields?.callSighash : false
-    }, {
-        callType: STRING,
-        from: BYTES,
-        to: BYTES,
-        value: option(QTY),
-        gas: QTY,
-        input: BYTES,
-        sighash: withDefault('0x', BYTES)
-    })
+    let traceCallAction = project(
+        {
+            callType: fields?.callCallType,
+            from: forArchive ? fields?.callFrom : true,
+            to: forArchive ? fields?.callTo : true,
+            value: fields?.callValue,
+            gas: fields?.callGas,
+            input: forArchive ? fields?.callInput : true,
+            sighash: forArchive ? fields?.callSighash : false,
+        },
+        {
+            callType: STRING,
+            from: BYTES,
+            to: BYTES,
+            value: option(QTY),
+            gas: QTY,
+            input: BYTES,
+            sighash: withDefault('0x', BYTES),
+        }
+    )
 
-    let traceCallResult = project({
-        gasUsed: fields?.callResultGasUsed,
-        output: fields?.callResultOutput
-    }, {
-        gasUsed: QTY,
-        output: withDefault('0x', BYTES)
-    })
+    let traceCallResult = project(
+        {
+            gasUsed: fields?.callResultGasUsed,
+            output: fields?.callResultOutput,
+        },
+        {
+            gasUsed: QTY,
+            output: withDefault('0x', BYTES),
+        }
+    )
 
     let TraceCall = object({
         ...traceBase,
         action: isEmpty(traceCallAction) ? undefined : object(traceCallAction),
-        result: isEmpty(traceCallResult) ? undefined : option(object(traceCallResult))
+        result: isEmpty(traceCallResult) ? undefined : option(object(traceCallResult)),
     })
 
-    let traceSuicideAction = project({
-        address: fields?.suicideAddress,
-        refundAddress: forArchive ? fields?.suicideRefundAddress : true,
-        balance: fields?.suicideBalance
-    }, {
-        address: BYTES,
-        refundAddress: BYTES,
-        balance: QTY
-    })
+    let traceSuicideAction = project(
+        {
+            address: fields?.suicideAddress,
+            refundAddress: forArchive ? fields?.suicideRefundAddress : true,
+            balance: fields?.suicideBalance,
+        },
+        {
+            address: BYTES,
+            refundAddress: BYTES,
+            balance: QTY,
+        }
+    )
 
     let TraceSuicide = object({
         ...traceBase,
-        action: isEmpty(traceSuicideAction) ? undefined : object(traceSuicideAction)
+        action: isEmpty(traceSuicideAction) ? undefined : object(traceSuicideAction),
     })
 
-    let traceRewardAction = project({
-        author: forArchive ? fields?.rewardAuthor : true,
-        value: fields?.rewardValue,
-        type: fields?.rewardType
-    }, {
-        author: BYTES,
-        value: QTY,
-        type: STRING
-    })
+    let traceRewardAction = project(
+        {
+            author: forArchive ? fields?.rewardAuthor : true,
+            value: fields?.rewardValue,
+            type: fields?.rewardType,
+        },
+        {
+            author: BYTES,
+            value: QTY,
+            type: STRING,
+        }
+    )
 
     let TraceReward = object({
         ...traceBase,
-        action: isEmpty(traceRewardAction) ? undefined : object(traceRewardAction)
+        action: isEmpty(traceRewardAction) ? undefined : object(traceRewardAction),
     })
 
     return taggedUnion('type', {
         create: TraceCreate,
         call: TraceCall,
         suicide: TraceSuicide,
-        reward: TraceReward
+        reward: TraceReward,
     })
 }
-
 
 export function project<T extends object, F extends {[K in keyof T]?: boolean}>(
     fields: F | undefined,
@@ -240,13 +253,11 @@ export function project<T extends object, F extends {[K in keyof T]?: boolean}>(
     return result
 }
 
-
 export function isEmpty(obj: object): boolean {
     for (let _ in obj) {
         return false
     }
     return true
 }
-
 
 export function assertAssignable<A, B extends A>(): void {}

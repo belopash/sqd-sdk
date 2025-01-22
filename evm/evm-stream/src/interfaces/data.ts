@@ -1,263 +1,173 @@
+import {Get, OverrideKeys, Select, Selector, Simplify} from '@subsquid/util-types'
 import {
-    EvmBlockHeader,
-    EvmLog,
-    EvmStateDiff,
-    EvmStateDiffBase,
-    EvmTraceBase,
-    EvmTraceCallAction,
-    EvmTraceCallResult,
-    EvmTraceCreateAction,
-    EvmTraceCreateResult,
-    EvmTraceRewardAction,
-    EvmTraceSuicideAction,
-    EvmTransaction
+    BlockFields,
+    LogFields,
+    StateDiffBaseFields,
+    TraceBaseFields,
+    TraceCallActionFields,
+    TraceCallResultFields,
+    TraceCallFields,
+    TraceCreateFields,
+    TraceCreateActionFields,
+    TraceCreateResultFields,
+    TraceRewardActionFields,
+    TraceSuicideActionFields,
+    TransactionFields,
+    TransactionReceiptFields,
+    StateDiffFields,
+    TraceSuicideFields,
+    TraceRewardFields,
 } from './evm'
 
-
-type Simplify<T> = {
-    [K in keyof T]: T[K]
-} & {}
-
-
-type Selector<Props extends string, Exclusion> = {
-    [P in Exclude<Props, Exclusion>]?: boolean
-}
-
-
-type AddPrefix<Prefix extends string, S extends string> = `${Prefix}${Capitalize<S>}`
-
-
-export type BlockRequiredFields = 'height' | 'hash' | 'parentHash'
+export type BlockRequiredFields = 'number' | 'hash' | 'parentHash'
 export type TransactionRequiredFields = 'transactionIndex'
+export type TransactionReceiptRequiredFields = 'transactionIndex'
 export type LogRequiredFields = 'logIndex' | 'transactionIndex'
 export type TraceRequiredFields = 'transactionIndex' | 'traceAddress' | 'type'
-export type StateDiffRequiredFields = 'transactionIndex' | 'address' | 'key'
+export type StateDiffRequiredFields = 'transactionIndex' | 'address' | 'key' | 'kind'
 
-
-export interface FieldSelection {
-    block?: Selector<keyof EvmBlockHeader, BlockRequiredFields>
-    transaction?: Selector<keyof EvmTransaction, TransactionRequiredFields>
-    log?: Selector<keyof EvmLog, LogRequiredFields>
-    trace?: Selector<
-        keyof EvmTraceBase |
-        AddPrefix<'create', keyof EvmTraceCreateAction> |
-        AddPrefix<'createResult', keyof EvmTraceCreateResult> |
-        AddPrefix<'call', keyof EvmTraceCallAction> |
-        AddPrefix<'callResult', keyof EvmTraceCallResult> |
-        AddPrefix<'suicide', keyof EvmTraceSuicideAction> |
-        AddPrefix<'reward', keyof EvmTraceRewardAction>,
-        TraceRequiredFields
-    >
-    stateDiff?: Selector<keyof EvmStateDiff, StateDiffRequiredFields>
+export type BlockFieldSelection = Selector<Exclude<keyof BlockFields, BlockRequiredFields>>
+export type TransactionFieldSelection = Selector<Exclude<keyof TransactionFields, TransactionRequiredFields>>
+export type TransactionReceiptFieldSelection = Selector<
+    Exclude<keyof TransactionReceiptFields, TransactionReceiptRequiredFields>
+>
+export type LogFieldSelection = Selector<Exclude<keyof LogFields, LogRequiredFields>>
+export type TraceCreateActionFieldSelection = Selector<keyof TraceCreateActionFields>
+export type TraceCreateResultFieldSelection = Selector<keyof TraceCreateResultFields>
+export type TraceCreateFieldSelection = Simplify<
+    Selector<Exclude<keyof TraceCreateFields, TraceRequiredFields | 'action' | 'result'>> & {
+        action?: TraceCreateActionFieldSelection
+        result?: TraceCreateResultFieldSelection
+    }
+>
+export type TraceCallActionFieldSelection = Selector<keyof TraceCallActionFields>
+export type TraceCallResultFieldSelection = Selector<keyof TraceCallResultFields>
+export type TraceCallFieldSelection = Simplify<
+    Selector<Exclude<keyof TraceCallFields, TraceRequiredFields | 'action' | 'result'>> & {
+        action?: TraceCallActionFieldSelection
+        result?: TraceCallResultFieldSelection
+    }
+>
+export type TraceRewardActionFieldSelection = Selector<keyof TraceRewardActionFields>
+export type TraceRewardFieldSelection = Simplify<
+    Selector<Exclude<keyof TraceRewardFields, TraceRequiredFields | 'action'>> & {
+        action?: TraceRewardActionFieldSelection
+    }
+>
+export type TraceSuicideActionFieldSelection = Selector<keyof TraceSuicideActionFields>
+export type TraceSuicideFieldSelection = Simplify<
+    Selector<Exclude<keyof TraceSuicideFields, TraceRequiredFields | 'action'>> & {
+        action?: TraceSuicideActionFieldSelection
+    }
+>
+export type TraceFieldSelection = Simplify<
+    Selector<Exclude<keyof TraceBaseFields, TraceRequiredFields>> & {
+        create?: TraceCreateFieldSelection
+        call?: TraceCallFieldSelection
+        reward?: TraceRewardFieldSelection
+        suicide?: TraceSuicideFieldSelection
+    }
+>
+export type StateDiffFieldSelection = Selector<Exclude<keyof StateDiffFields, StateDiffRequiredFields>>
+export type FieldSelection = {
+    block?: BlockFieldSelection
+    transaction?: TransactionFieldSelection
+    receipt?: TransactionReceiptFieldSelection
+    log?: LogFieldSelection
+    trace?: TraceFieldSelection
+    stateDiff?: StateDiffFieldSelection
 }
 
+type Trues<T> = Simplify<{
+    [K in keyof T]-?: {[k: string]: boolean} extends T[K] ? Trues<T[K]> : true
+}>
 
-export const DEFAULT_FIELDS = {
-    block: {
-        timestamp: true
-    },
-    log: {
-        address: true,
-        topics: true,
-        data: true
-    },
-    transaction: {
-        from: true,
-        to: true,
-        hash: true
-    },
-    trace: {
-        error: true
-    },
-    stateDiff: {
-        kind: true,
-        next: true,
-        prev: true
-    }
-} as const
+export type FieldSelectionAll = Trues<FieldSelection>
 
-
-type DefaultFields = typeof DEFAULT_FIELDS
-
-
-type ExcludeUndefined<T> = {
-    [K in keyof T as undefined extends T[K] ? never : K]: T[K]
-} & {}
-
-
-type MergeDefault<T, D> = Simplify<
-    undefined extends T ? D : Omit<D, keyof ExcludeUndefined<T>> & ExcludeUndefined<T>
+export type Block<F extends FieldSelection = FieldSelectionAll> = Simplify<
+    Pick<BlockFields, BlockRequiredFields> & Select<BlockFields, Get<F, 'block'>>
 >
 
-
-type TrueFields<F> = keyof {
-    [K in keyof F as true extends F[K] ? K : never]: true
-}
-
-
-type GetFields<F extends FieldSelection, P extends keyof DefaultFields>
-    = TrueFields<MergeDefault<F[P], DefaultFields[P]>>
-
-
-type Select<T, F> = T extends any ? Simplify<Pick<T, Extract<keyof T, F>>> : never
-
-
-export type BlockHeader<F extends FieldSelection = {}> = Simplify<
-    {id: string} &
-    Pick<EvmBlockHeader, BlockRequiredFields> &
-    Select<EvmBlockHeader, GetFields<F, 'block'>>
+export type Transaction<F extends FieldSelection = FieldSelectionAll> = Simplify<
+    Pick<TransactionFields, TransactionRequiredFields> & Select<TransactionFields, Get<F, 'transaction'>>
 >
 
-
-export type Transaction<F extends FieldSelection = {}> = Simplify<
-    {id: string} &
-    Pick<EvmTransaction, TransactionRequiredFields> &
-    Select<EvmTransaction, GetFields<F, 'transaction'>> &
-    {
-        block: BlockHeader<F>
-        logs: Log<F>[]
-        traces: Trace<F>[]
-        stateDiffs: StateDiff<F>[]
-    }
+export type TransactionReceipt<F extends FieldSelection = FieldSelectionAll> = Simplify<
+    Pick<TransactionReceiptFields, TransactionReceiptRequiredFields> &
+        Select<TransactionReceiptFields, Get<F, 'receipt'>>
 >
 
-
-export type Log<F extends FieldSelection = {}> = Simplify<
-    {id: string} &
-    Pick<EvmLog, LogRequiredFields> &
-    Select<EvmLog, GetFields<F, 'log'>> &
-    {
-        block: BlockHeader<F>,
-        transaction?: Transaction<F>
-        getTransaction(): Transaction<F>
-    }
+export type Log<F extends FieldSelection = FieldSelectionAll> = Simplify<
+    Pick<LogFields, LogRequiredFields> & Select<LogFields, Get<F, 'log'>>
 >
 
-
-type RemovePrefix<Prefix extends string, T>
-    = T extends `${Prefix}${infer S}`
-        ? Uncapitalize<S>
-        : never
-
-
-export type TraceCreateAction<F extends FieldSelection = {}> = Select<
-    EvmTraceCreateAction,
-    RemovePrefix<'create', GetFields<F, 'trace'>>
+export type TraceCreateAction<F extends FieldSelection = FieldSelectionAll> = Simplify<
+    Select<TraceCreateActionFields, Get<F, 'trace.create.action'>>
 >
 
-
-export type TraceCreateResult<F extends FieldSelection = {}> = Select<
-    EvmTraceCreateResult,
-    RemovePrefix<'createResult', GetFields<F, 'trace'>>
+export type TraceCreateResult<F extends FieldSelection = FieldSelectionAll> = Simplify<
+    Select<TraceCreateResultFields, Get<F, 'trace.create.result'>>
 >
 
-
-export type TraceCallAction<F extends FieldSelection = {}> = Select<
-    EvmTraceCallAction,
-    RemovePrefix<'call', GetFields<F, 'trace'>>
+export type TraceCallAction<F extends FieldSelection = FieldSelectionAll> = Simplify<
+    Select<TraceCallActionFields, Get<F, 'trace.call.action'>>
 >
 
-
-export type TraceCallResult<F extends FieldSelection = {}> = Select<
-    EvmTraceCallResult,
-    RemovePrefix<'callResult', GetFields<F, 'trace'>>
+export type TraceCallResult<F extends FieldSelection = FieldSelectionAll> = Simplify<
+    Select<TraceCallResultFields, Get<F, 'trace.call.result'>>
 >
 
-
-export type TraceSuicideAction<F extends FieldSelection = {}> = Select<
-    EvmTraceSuicideAction,
-    RemovePrefix<'suicide', GetFields<F, 'trace'>>
+export type TraceSuicideAction<F extends FieldSelection = FieldSelectionAll> = Simplify<
+    Select<TraceSuicideActionFields, Get<F, 'trace.suicide.action'>>
 >
 
-
-export type TraceRewardAction<F extends FieldSelection = {}> = Select<
-    EvmTraceRewardAction,
-    RemovePrefix<'reward', GetFields<F, 'trace'>>
+export type TraceRewardAction<F extends FieldSelection = FieldSelectionAll> = Simplify<
+    Select<TraceRewardActionFields, Get<F, 'trace.reward.action'>>
 >
 
-
-type TraceBase<F extends FieldSelection = {}> =
-    Pick<EvmTraceBase, Exclude<TraceRequiredFields, 'type'>> &
-    Select<EvmTraceBase, GetFields<F, 'trace'>> &
-    {
-        block: BlockHeader<F>,
-        transaction?: Transaction<F>
-        getTransaction(): Transaction<F>
-        parent?: Trace<F>
-        getParent(): Trace<F>
-        children: Trace<F>[]
-    }
-
+export type TraceBase<F extends FieldSelection = FieldSelectionAll> = Pick<
+    TraceBaseFields,
+    Exclude<TraceRequiredFields, 'type'>
+>
 
 type RemoveEmptyObjects<T> = {
     [K in keyof T as {} extends T[K] ? never : K]: T[K]
 }
 
-
-export type TraceCreate<F extends FieldSelection = {}> = Simplify<
-    TraceBase<F> &
-    {type: 'create'} &
-    RemoveEmptyObjects<{action: TraceCreateAction<F>, result?: TraceCreateResult<F>}>
+export type TraceCreate<F extends FieldSelection = FieldSelectionAll> = Simplify<
+    TraceBase<F> & {type: 'create'} & Select<TraceCreateFields, OverrideKeys<Get<F, 'trace'>, Get<F, 'trace.create'>>> &
+        RemoveEmptyObjects<{action: TraceCreateAction<F>; result?: TraceCreateResult<F>}>
 >
 
-
-export type TraceCall<F extends FieldSelection = {}> = Simplify<
-    TraceBase<F> &
-    {type: 'call'} &
-    RemoveEmptyObjects<{action: TraceCallAction<F>, result?: TraceCallResult<F>}>
+export type TraceCall<F extends FieldSelection = FieldSelectionAll> = Simplify<
+    TraceBase<F> & {type: 'call'} & Select<TraceCallFields, OverrideKeys<Get<F, 'trace'>, Get<F, 'trace.call'>>> &
+        RemoveEmptyObjects<{action: TraceCallAction<F>; result?: TraceCallResult<F>}>
 >
 
-
-export type TraceSuicide<F extends FieldSelection = {}> = Simplify<
-    TraceBase<F> &
-    {type: 'suicide'} &
-    RemoveEmptyObjects<{action: TraceSuicideAction<F>}>
+export type TraceSuicide<F extends FieldSelection = FieldSelectionAll> = Simplify<
+    TraceBase<F> & {type: 'suicide'} & Select<
+            TraceSuicideFields,
+            OverrideKeys<Get<F, 'trace'>, Get<F, 'trace.suicide'>>
+        > &
+        RemoveEmptyObjects<{action: TraceSuicideAction<F>}>
 >
 
-
-export type TraceReward<F extends FieldSelection = {}> = Simplify<
-    TraceBase<F> &
-    {type: 'reward'} &
-    RemoveEmptyObjects<{action: TraceRewardAction<F>}>
+export type TraceReward<F extends FieldSelection = FieldSelectionAll> = Simplify<
+    TraceBase<F> & {type: 'reward'} & Select<TraceRewardFields, OverrideKeys<Get<F, 'trace'>, Get<F, 'trace.reward'>>> &
+        RemoveEmptyObjects<{action: TraceRewardAction<F>}>
 >
 
+export type Trace<F extends FieldSelection = FieldSelectionAll> =
+    | TraceCreate<F>
+    | TraceCall<F>
+    | TraceSuicide<F>
+    | TraceReward<F>
 
-export type Trace<F extends FieldSelection = {}> =
-    TraceCreate<F> |
-    TraceCall<F> |
-    TraceSuicide<F> |
-    TraceReward<F>
-
-
-export type StateDiff<F extends FieldSelection = {}> = Simplify<
-    EvmStateDiffBase &
-    Select<EvmStateDiff, GetFields<F, 'stateDiff'>> &
-    {
-        block: BlockHeader<F>
-        transaction?: Transaction<F>
-        getTransaction(): Transaction<F>
-    }
+export type StateDiffBase<F extends FieldSelection = FieldSelectionAll> = Pick<
+    StateDiffBaseFields,
+    StateDiffRequiredFields
 >
 
-
-export type BlockData<F extends FieldSelection = {}> = {
-    header: BlockHeader<F>
-    transactions: Transaction<F>[]
-    logs: Log<F>[]
-    traces: Trace<F>[]
-    stateDiffs: StateDiff<F>[]
-}
-
-
-export type AllFields = {
-    block: Trues<FieldSelection['block']>
-    transaction: Trues<FieldSelection['transaction']>
-    log: Trues<FieldSelection['log']>
-    trace: Trues<FieldSelection['trace']>
-    stateDiff: Trues<FieldSelection['stateDiff']>
-}
-
-
-type Trues<T> = {
-    [K in keyof Exclude<T, undefined>]-?: true
-}
+export type StateDiff<F extends FieldSelection = FieldSelectionAll> = Simplify<
+    StateDiffBase<F> & Select<StateDiffFields, Get<F, 'stateDiff'>>
+>

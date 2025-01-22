@@ -1,6 +1,7 @@
 import {PortalClient} from '@subsquid/portal-client'
 import {HttpClient} from '@subsquid/http-client'
-import {createLogger} from '@subsquid/logger'
+import {EvmPortalDataSource} from '@subsquid/evm-stream'
+import {EvmQueryBuilder} from '@subsquid/evm-stream/lib/builder'
 
 async function main() {
     let portal = new PortalClient({
@@ -8,48 +9,19 @@ async function main() {
         http: new HttpClient({
             retryAttempts: Infinity,
         }),
-        minBytes: 40 * 1024 * 1024,
     })
 
-    // let query: Query = {t
-    //     range: {
-    //         from: 0,
-    //     },
-    //     request: {
-    //         logs: [
-    //             {
-    //                 address: ['0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48'],
-    //                 topic0: ['0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef'],
-    //             },
-    //         ],
-    //     },
-    // }
-
-    // let ds = new EvmPortalDataSource({
-    //     portal,
-    //     query,
-    //     fields: {
-    //         block: {timestamp: true, size: true, number: true, hash: true, parentHash: true},
-    //         transaction: {from: true, to: true, hash: true, transactionIndex: true},
-    //         log: {
-    //             address: true,
-    //             topics: true,
-    //             data: true,
-    //             transactionHash: true,
-    //             logIndex: true,
-    //             transactionIndex: true,
-    //         },
-    //     },
-    // })
-
-    let fromBlock = await portal.getFinalizedHeight().then((h) => h - 100_000)
-
-    let query = {
-        type: 'evm',
-        fromBlock,
-        fields: {
-            block: {timestamp: true, size: true, number: true, hash: true, parentHash: true},
-            transaction: {from: true, to: true, hash: true, transactionIndex: true},
+    let query = new EvmQueryBuilder()
+        .setFields({
+            block: {
+                number: true,
+                hash: true,
+            },
+            transaction: {
+                from: true,
+                to: true,
+                hash: true,
+            },
             log: {
                 address: true,
                 topics: true,
@@ -58,25 +30,33 @@ async function main() {
                 logIndex: true,
                 transactionIndex: true,
             },
-        },
-        logs: [
-            {
+            stateDiff: {
+                kind: true,
+                next: true,
+                prev: true,
+            },
+        })
+        .addLog({
+            request: {
                 address: ['0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48'],
                 topic0: ['0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef'],
             },
-        ],
-        // includeAllBlocks: true,
-    }
+        })
+        .build()
 
-    let stream = portal.getFinalizedStream(query, {stopOnHead: true})
-    for await (let {blocks, finalizedHead} of stream) {
+    let dataSource = new EvmPortalDataSource({
+        portal,
+        query,
+    })
+
+    let from = await dataSource.getFinalizedHeight().then((h) => h - 1_000_000)
+
+    for await (let {blocks, finalizedHead} of dataSource.getBlockStream({from}, true)) {
         console.log(
-            `progress: ${blocks[blocks.length - 1].header.number} / ${finalizedHead.height}, ` +
-                `blocks: ${blocks.length}, `
-            // +                `logs: ${blocks.reduce((r, b) => (r += b.logs.length), 0)}`
+            `progress: ${blocks[blocks.length - 1].header.number} / ${finalizedHead.number}, ` +
+                `blocks: ${blocks.length}, ` +
+                `logs: ${blocks.reduce((r, b) => (r += b.logs?.length || 0), 0)}`
         )
-
-        // break
     }
     console.log(`end`)
 }

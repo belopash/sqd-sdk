@@ -1,318 +1,354 @@
 import assert from 'assert'
-import {Bytes, Bytes20, Bytes32, Bytes8} from '../interfaces/base'
 import {
-    EIP7702Authorization,
-    EvmTraceCallAction,
-    EvmTraceCallResult,
-    EvmTraceCreateAction,
-    EvmTraceCreateResult,
-    EvmTraceRewardAction,
-    EvmTraceSuicideAction,
+    BlockFields,
+    LogFields,
+    StateDiffAddFields,
+    StateDiffBaseFields,
+    StateDiffChangeFields,
+    StateDiffDeleteFields,
+    StateDiffNoChangeFields,
+    TraceBaseFields,
+    TraceCallFields,
+    TraceCreateFields,
+    TraceRewardFields,
+    TraceSuicideFields,
+    TransactionFields,
+    TransactionReceiptFields,
 } from '../interfaces/evm'
+import type {Block, Log, Transaction, TransactionReceipt, TraceBase, StateDiffBase} from '../interfaces/data'
 
-export class Block {
-    header: BlockHeader
-    transactions: Transaction[] = []
-    logs: Log[] = []
-    traces: Trace[] = []
-    stateDiffs: StateDiff[] = []
+export interface BlockEntity extends BlockFields {}
+export class BlockEntity implements Block {
+    #transactions?: TransactionEntity[]
+    #receipts?: TransactionReceiptEntity[]
+    #logs?: LogEntity[]
+    #traces?: TraceEntity[]
+    #stateDiffs?: StateDiffEntity[]
 
-    constructor(header: BlockHeader) {
-        this.header = header
-    }
-}
-
-export class BlockHeader {
-    id: string
-    height: number
-    hash: Bytes32
-    parentHash: Bytes32
-    nonce?: Bytes8
-    sha3Uncles?: Bytes32
-    logsBloom?: Bytes
-    transactionsRoot?: Bytes32
-    stateRoot?: Bytes32
-    receiptsRoot?: Bytes32
-    mixHash?: Bytes
-    miner?: Bytes20
-    difficulty?: bigint
-    totalDifficulty?: bigint
-    extraData?: Bytes
-    size?: bigint
-    gasLimit?: bigint
-    gasUsed?: bigint
-    timestamp?: number
-    baseFeePerGas?: bigint
-    l1BlockNumber?: number
-
-    constructor(height: number, hash: Bytes20, parentHash: Bytes20) {
-        this.id = formatId({height, hash})
-        this.height = height
-        this.hash = hash
-        this.parentHash = parentHash
-    }
-}
-
-export class Transaction {
-    id: string
-    transactionIndex: number
-    from?: Bytes20
-    gas?: bigint
-    gasPrice?: bigint
-    maxFeePerGas?: bigint
-    maxPriorityFeePerGas?: bigint
-    hash?: Bytes32
-    input?: Bytes
-    nonce?: number
-    to?: Bytes20
-    value?: bigint
-    v?: bigint
-    r?: Bytes32
-    s?: Bytes32
-    yParity?: number
-    chainId?: number
-    gasUsed?: bigint
-    cumulativeGasUsed?: bigint
-    effectiveGasPrice?: bigint
-    contractAddress?: Bytes32
-    type?: number
-    status?: number
-    sighash?: Bytes
-    authorizationList?: EIP7702Authorization[]
-    l1Fee?: bigint
-    l1FeeScalar?: number
-    l1GasPrice?: bigint
-    l1GasUsed?: bigint
-    l1BlobBaseFee?: bigint
-    l1BlobBaseFeeScalar?: number
-    l1BaseFeeScalar?: number
-    #block: BlockHeader
-    #logs?: Log[]
-    #traces?: Trace[]
-    #stateDiffs?: StateDiff[]
-
-    constructor(block: BlockHeader, transactionIndex: number) {
-        this.id = formatId(block, transactionIndex)
-        this.transactionIndex = transactionIndex
-        this.#block = block
+    get transactions(): TransactionEntity[] {
+        return this.#transactions || (this.#transactions = [])
     }
 
-    get block(): BlockHeader {
-        return this.#block
+    set transactions(value: TransactionEntity[]) {
+        this.#transactions = value
     }
 
-    get logs(): Log[] {
+    get receipts(): TransactionReceiptEntity[] {
+        return this.#receipts || (this.#receipts = [])
+    }
+
+    set receipts(value: TransactionReceiptEntity[]) {
+        this.#receipts = value
+    }
+
+    get logs(): LogEntity[] {
         return this.#logs || (this.#logs = [])
     }
 
-    set logs(value: Log[]) {
+    set logs(value: LogEntity[]) {
         this.#logs = value
     }
 
-    get traces(): Trace[] {
+    get traces(): TraceEntity[] {
         return this.#traces || (this.#traces = [])
     }
 
-    set traces(value: Trace[]) {
+    set traces(value: TraceEntity[]) {
         this.#traces = value
     }
 
-    get stateDiffs(): StateDiff[] {
+    get stateDiffs(): StateDiffEntity[] {
         return this.#stateDiffs || (this.#stateDiffs = [])
     }
 
-    set stateDiffs(value: StateDiff[]) {
+    set stateDiffs(value: StateDiffEntity[]) {
         this.#stateDiffs = value
     }
 }
 
-export class Log {
-    id: string
-    logIndex: number
-    transactionIndex: number
-    transactionHash?: Bytes32
-    address?: Bytes20
-    data?: Bytes
-    topics?: Bytes32[]
-    #block: BlockHeader
-    #transaction?: Transaction
+export interface TransactionEntity extends TransactionFields {}
+export class TransactionEntity implements Transaction {
+    #block?: BlockEntity
+    #receipt?: TransactionReceiptEntity
+    #logs?: LogEntity[]
+    #traces?: TraceEntity[]
+    #stateDiffs?: StateDiffEntity[]
 
-    constructor(block: BlockHeader, logIndex: number, transactionIndex: number) {
-        this.id = formatId(block, logIndex)
-        this.logIndex = logIndex
-        this.transactionIndex = transactionIndex
-        this.#block = block
-    }
+    constructor() {}
 
-    get block(): BlockHeader {
+    get block(): BlockEntity {
+        assert(this.#block != null)
         return this.#block
     }
 
-    get transaction(): Transaction | undefined {
-        return this.#transaction
+    set block(value: BlockEntity) {
+        this.#block = value
     }
 
-    set transaction(value: Transaction | undefined) {
-        this.#transaction = value
+    get receipt(): TransactionReceiptEntity | undefined {
+        return this.#receipt
     }
 
-    getTransaction(): Transaction {
-        assert(this.transaction != null)
-        return this.transaction
+    set receipt(value: TransactionReceiptEntity | undefined) {
+        this.#receipt = value
+    }
+
+    getReceipt(): TransactionReceiptEntity {
+        assert(this.receipt != null)
+        return this.receipt
+    }
+
+    get logs(): LogEntity[] {
+        return this.#logs || (this.#logs = [])
+    }
+
+    set logs(value: LogEntity[]) {
+        this.#logs = value
+    }
+
+    get traces(): TraceEntity[] {
+        return this.#traces || (this.#traces = [])
+    }
+
+    set traces(value: TraceEntity[]) {
+        this.#traces = value
+    }
+
+    get stateDiffs(): StateDiffEntity[] {
+        return this.#stateDiffs || (this.#stateDiffs = [])
+    }
+
+    set stateDiffs(value: StateDiffEntity[]) {
+        this.#stateDiffs = value
     }
 }
 
-class TraceBase {
-    id: string
-    transactionIndex: number
-    traceAddress: number[]
-    subtraces?: number
-    error?: string | null
-    revertReason?: string
-    #block: BlockHeader
-    #transaction?: Transaction
-    #parent?: Trace
-    #children?: Trace[]
+export interface TransactionReceiptEntity extends TransactionReceiptFields {}
+export class TransactionReceiptEntity implements TransactionReceipt {
+    #block?: BlockEntity
+    #transaction?: TransactionEntity
+    #logs?: LogEntity[]
+    #traces?: TraceEntity[]
+    #stateDiffs?: StateDiffEntity[]
 
-    constructor(block: BlockHeader, transactionIndex: number, traceAddress: number[]) {
-        this.id = formatId(block, transactionIndex, ...traceAddress)
-        this.transactionIndex = transactionIndex
-        this.traceAddress = traceAddress
-        this.#block = block
-    }
-
-    get block(): BlockHeader {
+    get block(): BlockEntity {
+        assert(this.#block != null)
         return this.#block
     }
 
-    get transaction(): Transaction | undefined {
+    set block(value: BlockEntity) {
+        this.#block = value
+    }
+
+    get transaction(): TransactionEntity | undefined {
         return this.#transaction
     }
 
-    set transaction(value: Transaction | undefined) {
+    set transaction(value: TransactionEntity | undefined) {
         this.#transaction = value
     }
 
-    getTransaction(): Transaction {
+    getTransaction(): TransactionEntity {
         assert(this.transaction != null)
         return this.transaction
     }
 
-    get parent(): Trace | undefined {
+    get logs(): LogEntity[] {
+        return this.#logs || (this.#logs = [])
+    }
+
+    set logs(value: LogEntity[]) {
+        this.#logs = value
+    }
+
+    get traces(): TraceEntity[] {
+        return this.#traces || (this.#traces = [])
+    }
+
+    set traces(value: TraceEntity[]) {
+        this.#traces = value
+    }
+
+    get stateDiffs(): StateDiffEntity[] {
+        return this.#stateDiffs || (this.#stateDiffs = [])
+    }
+
+    set stateDiffs(value: StateDiffEntity[]) {
+        this.#stateDiffs = value
+    }
+}
+
+export interface LogEntity extends LogFields {}
+export class LogEntity implements Log {
+    #block?: BlockEntity
+    #transaction?: TransactionEntity
+    #receipt?: TransactionReceiptEntity
+
+    get block(): BlockEntity {
+        assert(this.#block != null)
+        return this.#block
+    }
+
+    set block(value: BlockEntity) {
+        this.#block = value
+    }
+
+    get transaction(): TransactionEntity | undefined {
+        return this.#transaction
+    }
+
+    set transaction(value: TransactionEntity | undefined) {
+        this.#transaction = value
+    }
+
+    getTransaction(): TransactionEntity {
+        assert(this.transaction != null)
+        return this.transaction
+    }
+
+    get receipt(): TransactionReceiptEntity | undefined {
+        return this.#receipt
+    }
+
+    set receipt(value: TransactionReceiptEntity | undefined) {
+        this.#receipt = value
+    }
+
+    getReceipt(): TransactionReceiptEntity {
+        assert(this.receipt != null)
+        return this.receipt
+    }
+}
+
+interface TraceBaseEntity extends TraceBaseFields {}
+class TraceBaseEntity implements TraceBase {
+    #block?: BlockEntity
+    #transaction?: TransactionEntity
+    #receipt?: TransactionReceiptEntity
+    #parent?: TraceEntity
+    #children?: TraceEntity[]
+
+    get block(): BlockEntity {
+        assert(this.#block != null)
+        return this.#block
+    }
+
+    set block(value: BlockEntity) {
+        this.#block = value
+    }
+
+    get transaction(): TransactionEntity | undefined {
+        return this.#transaction
+    }
+
+    set transaction(value: TransactionEntity | undefined) {
+        this.#transaction = value
+    }
+
+    getTransaction(): TransactionEntity {
+        assert(this.transaction != null)
+        return this.transaction
+    }
+
+    get receipt(): TransactionReceiptEntity | undefined {
+        return this.#receipt
+    }
+
+    set receipt(value: TransactionReceiptEntity | undefined) {
+        this.#receipt = value
+    }
+
+    getReceipt(): TransactionReceiptEntity {
+        assert(this.receipt != null)
+        return this.receipt
+    }
+
+    get parent(): TraceEntity | undefined {
         return this.#parent
     }
 
-    set parent(value: Trace | undefined) {
+    set parent(value: TraceEntity | undefined) {
         this.#parent = value
     }
 
-    getParent(): Trace {
+    getParent(): TraceEntity {
         assert(this.parent != null)
         return this.parent
     }
 
-    get children(): Trace[] {
+    get children(): TraceEntity[] {
         return this.#children || (this.#children = [])
     }
 
-    set children(value: Trace[]) {
+    set children(value: TraceEntity[]) {
         this.#children = value
     }
 }
 
-export class TraceCreate extends TraceBase {
-    type: 'create' = 'create'
-    action?: Partial<EvmTraceCreateAction>
-    result?: Partial<EvmTraceCreateResult>
-}
+export interface TraceCreateEntity extends TraceCreateFields {}
+export class TraceCreateEntity extends TraceBaseEntity {}
 
-export class TraceCall extends TraceBase {
-    type: 'call' = 'call'
-    action?: Partial<EvmTraceCallAction>
-    result?: Partial<EvmTraceCallResult>
-}
+export interface TraceCallEntity extends TraceCallFields {}
+export class TraceCallEntity extends TraceBaseEntity {}
 
-export class TraceSuicide extends TraceBase {
-    type: 'suicide' = 'suicide'
-    action?: Partial<EvmTraceSuicideAction>
-}
+export interface TraceSuicideEntity extends TraceSuicideFields {}
+export class TraceSuicideEntity extends TraceBaseEntity {}
 
-export class TraceReward extends TraceBase {
-    type: 'reward' = 'reward'
-    action?: Partial<EvmTraceRewardAction>
-}
+export interface TraceRewardEntity extends TraceRewardFields {}
+export class TraceRewardEntity extends TraceBaseEntity {}
 
-export type Trace = TraceCreate | TraceCall | TraceSuicide | TraceReward
+export type TraceEntity = TraceCreateEntity | TraceCallEntity | TraceSuicideEntity | TraceRewardEntity
 
-class StateDiffBase {
-    transactionIndex: number
-    address: Bytes20
-    key: 'balance' | 'code' | 'nonce' | Bytes32
-    #block: BlockHeader
-    #transaction?: Transaction
+interface StateDiffBaseEntity extends StateDiffBaseFields {}
+class StateDiffBaseEntity implements StateDiffBase {
+    #block?: BlockEntity
+    #transaction?: TransactionEntity
 
-    constructor(
-        block: BlockHeader,
-        transactionIndex: number,
-        address: Bytes20,
-        key: 'balance' | 'code' | 'nonce' | Bytes32
-    ) {
-        this.transactionIndex = transactionIndex
-        this.address = address
-        this.key = key
-        this.#block = block
-    }
-
-    get block(): BlockHeader {
+    get block(): BlockEntity {
+        assert(this.#block != null)
         return this.#block
     }
 
-    get transaction(): Transaction | undefined {
+    set block(value: BlockEntity) {
+        this.#block = value
+    }
+
+    get transaction(): TransactionEntity | undefined {
         return this.#transaction
     }
 
-    set transaction(value: Transaction | undefined) {
+    set transaction(value: TransactionEntity | undefined) {
         this.#transaction = value
     }
 
-    getTransaction(): Transaction {
+    getTransaction(): TransactionEntity {
         assert(this.transaction != null)
         return this.transaction
     }
 }
 
-export class StateDiffNoChange extends StateDiffBase {
+export interface StateDiffNoChangeEntity extends StateDiffNoChangeFields {}
+export class StateDiffNoChangeEntity extends StateDiffBaseEntity {
     kind: '=' = '='
-    prev?: null
-    next?: null
 }
 
-export class StateDiffAdd extends StateDiffBase {
+export interface StateDiffAddEntity extends StateDiffAddFields {}
+export class StateDiffAddEntity extends StateDiffBaseEntity {
     kind: '+' = '+'
-    prev?: null
-    next?: Bytes
 }
 
-export class StateDiffChange extends StateDiffBase {
+export interface StateDiffChangeEntity extends StateDiffChangeFields {}
+export class StateDiffChangeEntity extends StateDiffBaseEntity {
     kind: '*' = '*'
-    prev?: Bytes
-    next?: Bytes
 }
 
-export class StateDiffDelete extends StateDiffBase {
+export interface StateDiffDeleteEntity extends StateDiffDeleteFields {}
+export class StateDiffDeleteEntity extends StateDiffBaseEntity {
     kind: '-' = '-'
-    prev?: Bytes
-    next?: null
 }
 
-export type StateDiff = StateDiffNoChange | StateDiffAdd | StateDiffChange | StateDiffDelete
-
-export function formatId(block: {hash: string; height: number}, ...address: number[]): string {
-    let no = block.height.toString().padStart(10, '0')
-    let hash = block.hash.slice(2, 7)
-    let id = `${no}-${hash}`
-    for (let index of address) {
-        id += '-' + index.toString().padStart(6, '0')
-    }
-    return id
-}
+export type StateDiffEntity =
+    | StateDiffNoChangeEntity
+    | StateDiffAddEntity
+    | StateDiffChangeEntity
+    | StateDiffDeleteEntity
