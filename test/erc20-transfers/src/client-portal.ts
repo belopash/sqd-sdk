@@ -1,13 +1,14 @@
 import {PortalClient} from '@subsquid/portal-client'
 import {HttpClient} from '@subsquid/http-client'
 import {EvmPortalDataSource} from '@subsquid/evm-stream'
-import {EvmQueryBuilder} from '@subsquid/evm-stream/lib/builder'
+import {EvmQueryBuilder} from '@subsquid/evm-stream/lib/query'
 
 async function main() {
     let portal = new PortalClient({
         url: 'https://portal.sqd.dev/datasets/ethereum-mainnet',
         http: new HttpClient({
             retryAttempts: Infinity,
+            keepalive: true,
         }),
     })
 
@@ -53,9 +54,9 @@ async function main() {
 
     for await (let {blocks, finalizedHead} of dataSource.getBlockStream({from}, true)) {
         console.log(
-            `progress: ${blocks[blocks.length - 1].header.number} / ${finalizedHead.number}, ` +
-                `blocks: ${blocks.length}, ` +
-                `logs: ${blocks.reduce((r, b) => (r += b.logs?.length || 0), 0)}`
+            `[${new Date().toISOString()}] progress: ${blocks[blocks.length - 1].header.number} / ${
+                finalizedHead.number
+            }` + `, blocks: ${blocks.length}`
         )
     }
     console.log(`end`)

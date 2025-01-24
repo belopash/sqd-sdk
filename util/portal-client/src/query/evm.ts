@@ -12,7 +12,7 @@ import type {
     Simplify,
 } from '@subsquid/util-types'
 
-type BlockHeaderFields = {
+export type BlockHeaderFields = {
     number: number
     hash: Bytes32
     parentHash: Bytes32
@@ -37,7 +37,7 @@ type BlockHeaderFields = {
     l1BlockNumber?: number
 }
 
-type TransactionFields = {
+export type TransactionFields = {
     transactionIndex: number
     hash: Bytes32
     nonce: number
@@ -72,7 +72,7 @@ type TransactionFields = {
     l1BaseFeeScalar?: number
 }
 
-type LogFields = {
+export type LogFields = {
     logIndex: number
     transactionIndex: number
     transactionHash: Bytes32
@@ -81,7 +81,7 @@ type LogFields = {
     topics: Bytes32[]
 }
 
-type TraceBaseFields = {
+export type TraceBaseFields = {
     type: string
     transactionIndex: number
     traceAddress: number[]
@@ -90,28 +90,28 @@ type TraceBaseFields = {
     revertReason?: string
 }
 
-type TraceCreateFields = TraceBaseFields & {
+export type TraceCreateFields = TraceBaseFields & {
     type: 'create'
 }
 
-type TraceCreateActionFields = {
+export type TraceCreateActionFields = {
     from: Bytes20
     value: bigint
     gas: bigint
     init: Bytes
 }
 
-type TraceCreateResultFields = {
+export type TraceCreateResultFields = {
     gasUsed: bigint
     code: Bytes
     address: Bytes20
 }
 
-type TraceCallFields = TraceBaseFields & {
+export type TraceCallFields = TraceBaseFields & {
     type: 'call'
 }
 
-type TraceCallActionFields = {
+export type TraceCallActionFields = {
     callType: string
     from: Bytes20
     to: Bytes20
@@ -121,32 +121,32 @@ type TraceCallActionFields = {
     sighash: Bytes
 }
 
-type TraceCallResultFields = {
+export type TraceCallResultFields = {
     gasUsed: bigint
     output: Bytes
 }
 
-type TraceSuicideFields = TraceBaseFields & {
+export type TraceSuicideFields = TraceBaseFields & {
     type: 'suicide'
 }
 
-type TraceSuicideActionFields = {
+export type TraceSuicideActionFields = {
     address: Bytes20
     refundAddress: Bytes20
     balance: bigint
 }
 
-type TraceRewardFields = TraceBaseFields & {
+export type TraceRewardFields = TraceBaseFields & {
     type: 'reward'
 }
 
-type TraceRewardActionFields = {
+export type TraceRewardActionFields = {
     author: Bytes20
     value: bigint
     type: string
 }
 
-type StateDiffBaseFields = {
+export type StateDiffBaseFields = {
     transactionIndex: number
     address: Bytes20
     key: 'balance' | 'code' | 'nonce' | Bytes32
@@ -155,25 +155,25 @@ type StateDiffBaseFields = {
     next?: unknown
 }
 
-type StateDiffAddFields = StateDiffBaseFields & {
+export type StateDiffAddFields = StateDiffBaseFields & {
     kind: '+'
     prev?: null
     next: Bytes
 }
 
-type StateDiffNoChangeFields = StateDiffBaseFields & {
+export type StateDiffNoChangeFields = StateDiffBaseFields & {
     kind: '='
     prev?: null
     next?: null
 }
 
-type StateDiffChangeFields = StateDiffBaseFields & {
+export type StateDiffChangeFields = StateDiffBaseFields & {
     kind: '*'
     prev: Bytes
     next: Bytes
 }
 
-type StateDiffDeleteFields = StateDiffBaseFields & {
+export type StateDiffDeleteFields = StateDiffBaseFields & {
     kind: '-'
     prev: Bytes
     next?: null

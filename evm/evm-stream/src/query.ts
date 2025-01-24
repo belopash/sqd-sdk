@@ -8,11 +8,13 @@ import {
 } from '@subsquid/portal-client/lib/query/evm'
 import {applyRangeBound, mergeRangeRequests, Range, RangeRequest} from '@subsquid/util-internal-range'
 
-export type RangeRequestOptions<R> = {range?: Range; request: R}
-export type LogRequestOptions = RangeRequestOptions<LogRequest>
-export type TransactionRequestOptions = RangeRequestOptions<TransactionRequest>
-export type TraceRequestOptions = RangeRequestOptions<TraceRequest>
-export type StateDiffRequestOptions = RangeRequestOptions<StateDiffRequest>
+export * from '@subsquid/portal-client/lib/query/evm'
+
+export type RequestOptions<R> = {range?: Range; request: R}
+export type LogRequestOptions = RequestOptions<LogRequest>
+export type TransactionRequestOptions = RequestOptions<TransactionRequest>
+export type TraceRequestOptions = RequestOptions<TraceRequest>
+export type StateDiffRequestOptions = RequestOptions<StateDiffRequest>
 
 export type EvmQueryOptions<F extends FieldSelection> = {
     fields: F
@@ -107,7 +109,7 @@ function concatRequestLists<T extends object>(a?: T[], b?: T[]): T[] | undefined
     return result.length == 0 ? undefined : result
 }
 
-function mapRequest<T>(options: RangeRequestOptions<T>): T {
+function mapRequest<T>(options: RequestOptions<T>): T {
     let req = {...options.request}
     for (let key in req) {
         let val = (req as any)[key]

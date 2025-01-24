@@ -1,5 +1,5 @@
-import {HttpClient, HttpBodyTimeoutError} from '@subsquid/http-client'
-import {createFuture, Future, unexpectedCase, wait, withErrorContext} from '@subsquid/util-internal'
+import {HttpClient} from '@subsquid/http-client'
+import {createFuture, Future, Throttler, unexpectedCase, wait, withErrorContext} from '@subsquid/util-internal'
 import {HashAndNumber, PortalQuery, PortalResponse} from './query'
 
 export interface PortalClientOptions {
@@ -115,6 +115,7 @@ export class PortalClient {
             stopOnHead = false,
         } = options ?? {}
 
+        let top = new Throttler(() => this.getFinalizedHeight(request), 20_000)
         return createReadablePortalStream(
             query,
             {
@@ -127,10 +128,10 @@ export class PortalClient {
                 stopOnHead,
             },
             async (query, options) => {
-                // NOTE: we emulate the same behaviour as will be implemented for hot blocks stream,
+                // NOTE: we emulate the same behavior as will be implemented for hot blocks stream,
                 // but unfortunately we don't have any information about finalized block hash at the moment
                 let finalizedHead = {
-                    number: await this.getFinalizedHeight(options),
+                    number: await top.get(),
                     hash: '',
                 }
 
@@ -188,26 +189,30 @@ function createReadablePortalStream<
     let takeFuture: Future<void> = createFuture()
     let putFuture: Future<void> = createFuture()
 
-    let lastChunkTimestamp = Date.now()
-    let idleInterval: ReturnType<typeof setInterval> | undefined
-    let waitTimeout: ReturnType<typeof setTimeout> | undefined
-
     async function take() {
+        let waitTimeout = setTimeout(() => {
+            readyFuture.resolve()
+        }, maxWaitTime)
+        readyFuture.promise().finally(() => clearTimeout(waitTimeout))
+
+        await Promise.all([readyFuture.promise(), putFuture.promise()])
+
         if (state === 'failed') {
             throw error
         }
 
-        createWaitTimeout()
-        await readyFuture.promise()
-        await putFuture.promise()
-
         let value = buffer?.data
         buffer = undefined
+
         takeFuture.resolve()
 
         if (state === 'closed') {
             return {value, done: value == null}
         } else {
+            if (value == null) {
+                throw new Error('buffer is empty')
+            }
+
             takeFuture = createFuture()
             putFuture = createFuture()
             readyFuture = createFuture()
@@ -233,49 +238,21 @@ function createReadablePortalStream<
         takeFuture.resolve()
     }
 
-    function createIdleInterval() {
-        clearInterval(idleInterval)
-
-        let isTriggered = false
-        idleInterval = setInterval(() => {
-            if (isTriggered) return
-            if (Date.now() - lastChunkTimestamp >= maxIdleTime) {
-                isTriggered = true
-                readyFuture.resolve()
-            }
-        }, Math.ceil(maxIdleTime / 3))
-        readyFuture.promise().finally(destroyIdleInterval)
-    }
-
-    function destroyIdleInterval() {
-        clearInterval(idleInterval)
-        idleInterval = undefined
-    }
-
-    function createWaitTimeout() {
-        clearTimeout(waitTimeout)
-
-        waitTimeout = setTimeout(() => readyFuture.resolve(), maxWaitTime)
-        readyFuture.promise().finally(destroyWaitTimeout)
-    }
-
-    function destroyWaitTimeout() {
-        clearTimeout(waitTimeout)
-        waitTimeout = undefined
-    }
-
     async function ingest() {
         let abortSignal = abortStream.signal
         let {fromBlock = 0, toBlock = Infinity} = query
 
         try {
-            let reader: ReadableStreamDefaultReader<string[]> | undefined
+            while (true) {
+                if (abortSignal.aborted) break
+                if (fromBlock > toBlock) break
 
-            try {
-                while (true) {
-                    if (abortSignal.aborted) break
-                    if (fromBlock > toBlock) break
+                let reader: ReadableStreamDefaultReader<string[]> | undefined
 
+                let lastChunkTimestamp = Date.now()
+                let idleInterval: ReturnType<typeof setInterval> | undefined
+
+                try {
                     let res = await requestStream(
                         {
                             ...query,
@@ -301,7 +278,13 @@ function createReadablePortalStream<
 
                             lastChunkTimestamp = Date.now()
                             if (idleInterval == null) {
-                                createIdleInterval()
+                                idleInterval = setInterval(() => {
+                                    if (Date.now() - lastChunkTimestamp >= maxIdleTime) {
+                                        readyFuture.resolve()
+                                    }
+                                }, Math.ceil(maxIdleTime / 3))
+                                readyFuture.promise().finally(() => clearInterval(idleInterval))
+                                takeFuture.promise().finally(() => (idleInterval = undefined))
                             }
 
                             if (buffer == null) {
@@ -332,21 +315,15 @@ function createReadablePortalStream<
                                 await withAbort(takeFuture.promise(), abortSignal)
                             }
                         }
-
-                        destroyIdleInterval()
-                        if (buffer != null) {
-                            readyFuture.resolve()
-                        }
                     }
+
+                    if (buffer != null) {
+                        readyFuture.resolve()
+                    }
+                } finally {
+                    reader?.cancel().catch(() => {})
+                    clearInterval(idleInterval)
                 }
-            } catch (err) {
-                if (err instanceof HttpBodyTimeoutError) {
-                    // ignore
-                } else {
-                    throw err
-                }
-            } finally {
-                reader?.cancel().catch(() => {})
             }
         } catch (err) {
             if (abortSignal.aborted) {

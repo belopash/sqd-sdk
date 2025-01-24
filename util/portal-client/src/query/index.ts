@@ -1,7 +1,7 @@
 import {EvmQuery, EvmResponse} from './evm'
 
 export type BaseQuery = {
-    type: string
+    type: string & {}
     fromBlock?: number
     toBlock?: number
 }

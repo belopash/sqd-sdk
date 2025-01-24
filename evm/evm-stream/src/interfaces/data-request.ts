@@ -1,7 +1,9 @@
-import {Range} from '@subsquid/util-internal-range'
+import type {Range} from '@subsquid/util-internal-range'
 import type {Bytes, Bytes20, Bytes32} from '@subsquid/util-types'
+import type {FieldSelection} from './data'
 
-export type EvmQuery = {
+export type EvmQuery<F extends FieldSelection> = {
+    fields: F
     ranges: EvmQueryRange[]
 }
 
@@ -52,10 +54,12 @@ export interface TraceRequest {
     callSighash?: Bytes[]
     suicideRefundAddress?: Bytes[]
     rewardAuthor?: Bytes20[]
-    transaction?: boolean
-    transactionLogs?: boolean
-    subtraces?: boolean
-    parents?: boolean
+    include: {
+        transaction?: boolean
+        transactionLogs?: boolean
+        subtraces?: boolean
+        parents?: boolean
+    }
 }
 
 export interface StateDiffRequest {

@@ -1,9 +1,13 @@
-import assert from 'assert'
 import * as process from 'process'
 
 
+export function assert(val: unknown, msg?: string): asserts val {
+    if (!val) throw new Error(msg ?? 'Assertion failed')
+}
+
+
 export function assertNotNull<T>(val: T | undefined | null, msg?: string): T {
-    assert(val != null, msg)
+    if (val == null) throw new Error(msg)
     return val
 }
 

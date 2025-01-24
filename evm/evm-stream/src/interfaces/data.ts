@@ -1,5 +1,5 @@
-import {Get, OverrideKeys, Select, Selector, Simplify} from '@subsquid/util-types'
-import {
+import type {MergeDefault, Select, Selector, Simplify} from '@subsquid/util-types'
+import type {
     BlockFields,
     LogFields,
     StateDiffBaseFields,
@@ -84,90 +84,86 @@ type Trues<T> = Simplify<{
 
 export type FieldSelectionAll = Trues<FieldSelection>
 
-export type Block<F extends FieldSelection = FieldSelectionAll> = Simplify<
-    Pick<BlockFields, BlockRequiredFields> & Select<BlockFields, Get<F, 'block'>>
+export type Block<F extends BlockFieldSelection = Trues<BlockFieldSelection>> = Simplify<
+    Pick<BlockFields, BlockRequiredFields> & Select<BlockFields, F>
 >
 
-export type Transaction<F extends FieldSelection = FieldSelectionAll> = Simplify<
-    Pick<TransactionFields, TransactionRequiredFields> & Select<TransactionFields, Get<F, 'transaction'>>
+export type Transaction<F extends TransactionFieldSelection = Trues<TransactionFieldSelection>> = Simplify<
+    Pick<TransactionFields, TransactionRequiredFields> & Select<TransactionFields, F>
 >
 
-export type TransactionReceipt<F extends FieldSelection = FieldSelectionAll> = Simplify<
-    Pick<TransactionReceiptFields, TransactionReceiptRequiredFields> &
-        Select<TransactionReceiptFields, Get<F, 'receipt'>>
+export type TransactionReceipt<F extends TransactionReceiptFieldSelection = Trues<TransactionReceiptFieldSelection>> =
+    Simplify<Pick<TransactionReceiptFields, TransactionReceiptRequiredFields> & Select<TransactionReceiptFields, F>>
+
+export type Log<F extends LogFieldSelection = Trues<LogFieldSelection>> = Simplify<
+    Pick<LogFields, LogRequiredFields> & Select<LogFields, F>
 >
 
-export type Log<F extends FieldSelection = FieldSelectionAll> = Simplify<
-    Pick<LogFields, LogRequiredFields> & Select<LogFields, Get<F, 'log'>>
+export type TraceCreateAction<F extends TraceCreateActionFieldSelection = Trues<TraceCreateActionFieldSelection>> =
+    Simplify<Select<TraceCreateActionFields, F>>
+
+export type TraceCreateResult<F extends TraceCreateResultFieldSelection = Trues<TraceCreateResultFieldSelection>> =
+    Simplify<Select<TraceCreateResultFields, F>>
+
+export type TraceCallAction<F extends TraceCallActionFieldSelection = Trues<TraceCallActionFieldSelection>> = Simplify<
+    Select<TraceCallActionFields, F>
 >
 
-export type TraceCreateAction<F extends FieldSelection = FieldSelectionAll> = Simplify<
-    Select<TraceCreateActionFields, Get<F, 'trace.create.action'>>
+export type TraceCallResult<F extends TraceCallResultFieldSelection = Trues<TraceCallResultFieldSelection>> = Simplify<
+    Select<TraceCallResultFields, F>
 >
 
-export type TraceCreateResult<F extends FieldSelection = FieldSelectionAll> = Simplify<
-    Select<TraceCreateResultFields, Get<F, 'trace.create.result'>>
->
+export type TraceSuicideAction<F extends TraceSuicideActionFieldSelection = Trues<TraceSuicideActionFieldSelection>> =
+    Simplify<Select<TraceSuicideActionFields, F>>
 
-export type TraceCallAction<F extends FieldSelection = FieldSelectionAll> = Simplify<
-    Select<TraceCallActionFields, Get<F, 'trace.call.action'>>
->
+export type TraceRewardAction<F extends TraceRewardActionFieldSelection = Trues<TraceRewardActionFieldSelection>> =
+    Simplify<Select<TraceRewardActionFields, F>>
 
-export type TraceCallResult<F extends FieldSelection = FieldSelectionAll> = Simplify<
-    Select<TraceCallResultFields, Get<F, 'trace.call.result'>>
->
-
-export type TraceSuicideAction<F extends FieldSelection = FieldSelectionAll> = Simplify<
-    Select<TraceSuicideActionFields, Get<F, 'trace.suicide.action'>>
->
-
-export type TraceRewardAction<F extends FieldSelection = FieldSelectionAll> = Simplify<
-    Select<TraceRewardActionFields, Get<F, 'trace.reward.action'>>
->
-
-export type TraceBase<F extends FieldSelection = FieldSelectionAll> = Pick<
-    TraceBaseFields,
-    Exclude<TraceRequiredFields, 'type'>
->
+export type TraceBase = Pick<TraceBaseFields, Exclude<TraceRequiredFields, 'type'>>
 
 type RemoveEmptyObjects<T> = {
     [K in keyof T as {} extends T[K] ? never : K]: T[K]
 }
 
-export type TraceCreate<F extends FieldSelection = FieldSelectionAll> = Simplify<
-    TraceBase<F> & {type: 'create'} & Select<TraceCreateFields, OverrideKeys<Get<F, 'trace'>, Get<F, 'trace.create'>>> &
-        RemoveEmptyObjects<{action: TraceCreateAction<F>; result?: TraceCreateResult<F>}>
+type Get<F, P extends keyof F> = Exclude<F[P], undefined>
+
+export type TraceCreate<F extends TraceCreateFieldSelection = Trues<TraceCreateFieldSelection>> = Simplify<
+    TraceBase & {type: 'create'} & Select<TraceCreateFields, F> &
+        RemoveEmptyObjects<{action: TraceCreateAction<Get<F, 'action'>>; result?: TraceCreateResult<Get<F, 'result'>>}>
 >
 
-export type TraceCall<F extends FieldSelection = FieldSelectionAll> = Simplify<
-    TraceBase<F> & {type: 'call'} & Select<TraceCallFields, OverrideKeys<Get<F, 'trace'>, Get<F, 'trace.call'>>> &
-        RemoveEmptyObjects<{action: TraceCallAction<F>; result?: TraceCallResult<F>}>
+export type TraceCall<F extends TraceCallFieldSelection = Trues<TraceCallFieldSelection>> = Simplify<
+    TraceBase & {type: 'call'} & Select<TraceCallFields, F> &
+        RemoveEmptyObjects<{action: TraceCallAction<Get<F, 'action'>>; result?: TraceCallResult<Get<F, 'result'>>}>
 >
 
-export type TraceSuicide<F extends FieldSelection = FieldSelectionAll> = Simplify<
-    TraceBase<F> & {type: 'suicide'} & Select<
-            TraceSuicideFields,
-            OverrideKeys<Get<F, 'trace'>, Get<F, 'trace.suicide'>>
-        > &
-        RemoveEmptyObjects<{action: TraceSuicideAction<F>}>
+export type TraceSuicide<F extends TraceSuicideFieldSelection = Trues<TraceSuicideFieldSelection>> = Simplify<
+    TraceBase & {type: 'suicide'} & Select<TraceSuicideFields, F> &
+        RemoveEmptyObjects<{action: TraceSuicideAction<Get<F, 'action'>>}>
 >
 
-export type TraceReward<F extends FieldSelection = FieldSelectionAll> = Simplify<
-    TraceBase<F> & {type: 'reward'} & Select<TraceRewardFields, OverrideKeys<Get<F, 'trace'>, Get<F, 'trace.reward'>>> &
-        RemoveEmptyObjects<{action: TraceRewardAction<F>}>
+export type TraceReward<F extends TraceRewardFieldSelection = Trues<TraceRewardFieldSelection>> = Simplify<
+    TraceBase & {type: 'reward'} & Select<TraceRewardFields, F> &
+        RemoveEmptyObjects<{action: TraceRewardAction<Get<F, 'action'>>}>
 >
 
-export type Trace<F extends FieldSelection = FieldSelectionAll> =
-    | TraceCreate<F>
-    | TraceCall<F>
-    | TraceSuicide<F>
-    | TraceReward<F>
+export type Trace<F extends TraceFieldSelection = Trues<TraceFieldSelection>> =
+    | TraceCreate<MergeDefault<Get<F, 'create'>, F>>
+    | TraceCall<MergeDefault<Get<F, 'call'>, F>>
+    | TraceSuicide<MergeDefault<Get<F, 'suicide'>, F>>
+    | TraceReward<MergeDefault<Get<F, 'reward'>, F>>
 
-export type StateDiffBase<F extends FieldSelection = FieldSelectionAll> = Pick<
-    StateDiffBaseFields,
-    StateDiffRequiredFields
+export type StateDiffBase = Pick<StateDiffBaseFields, StateDiffRequiredFields>
+
+export type StateDiff<F extends StateDiffFieldSelection = Trues<StateDiffFieldSelection>> = Simplify<
+    StateDiffBase & Select<StateDiffFields, F>
 >
 
-export type StateDiff<F extends FieldSelection = FieldSelectionAll> = Simplify<
-    StateDiffBase<F> & Select<StateDiffFields, Get<F, 'stateDiff'>>
->
+export type BlockData<F extends FieldSelection = {}> = {
+    block: Block<Get<F, 'block'>>
+    transactions: Transaction<Get<F, 'transaction'>>[]
+    receipts: TransactionReceipt<Get<F, 'receipt'>>[]
+    logs: Log<Get<F, 'log'>>[]
+    traces: Trace<Get<F, 'trace'>>[]
+    stateDiffs: StateDiff<Get<F, 'stateDiff'>>[]
+}

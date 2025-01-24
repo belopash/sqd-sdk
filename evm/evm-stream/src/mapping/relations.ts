@@ -40,7 +40,7 @@ export function setUpRelations<F extends FieldSelection>(data: {
     receipts: Pick<TransactionReceiptFields, TransactionReceiptRequiredFields>[]
     traces: Pick<TraceFields, TraceRequiredFields>[]
     stateDiffs: Pick<StateDiffFields, StateDiffRequiredFields>[]
-}): Block<F> {
+}): Block<any> {
     let block = Object.assign(new BlockEntity(), data.block)
 
     block.logs = data.logs.map((log) => Object.assign(new LogEntity(), log)).sort((a, b) => a.logIndex - b.logIndex)
@@ -93,7 +93,7 @@ export function setUpRelations<F extends FieldSelection>(data: {
             tx.logs.push(rec)
         }
     }
- 
+
     for (let i = 0; i < block.traces.length; i++) {
         let rec = block.traces[i]
         let tx = txs[rec.transactionIndex]
@@ -122,7 +122,7 @@ export function setUpRelations<F extends FieldSelection>(data: {
         }
     }
 
-    return block as Block<F>
+    return block as Block<any>
 }
 
 function traceCompare(a: TraceEntity, b: TraceEntity) {

@@ -1,17 +1,7 @@
 import {applyRangeBound, Range} from '@subsquid/util-internal-range'
 import {PortalClient, PortalStreamData} from '@subsquid/portal-client'
 import {AsyncQueue, weakMemo} from '@subsquid/util-internal'
-import {
-    array,
-    BYTES,
-    cast,
-    NAT,
-    object,
-    option,
-    STRING,
-    taggedUnion,
-    withDefault,
-} from '@subsquid/util-internal-validation'
+import {array, BYTES, cast, NAT, object, STRING, taggedUnion, withDefault} from '@subsquid/util-internal-validation'
 import {
     getBlockHeaderProps,
     getTxProps,
@@ -20,11 +10,11 @@ import {
     getTraceFrameValidator,
     project,
 } from './mapping/schema'
-import {BlockData, FieldSelection} from '@subsquid/portal-client/lib/query/evm'
-import {EvmQueryOptions} from './builder'
+import {BlockData, EvmQueryOptions, FieldSelection} from './query'
+import {Bytes} from '@subsquid/util-types'
 
 export interface HashAndNumber {
-    hash: string
+    hash: Bytes
     number: number
 }
 
@@ -167,10 +157,10 @@ export const getBlockValidator = weakMemo(<F extends FieldSelection>(fields: F) 
 
     return object({
         header: BlockHeader,
-        transactions: option(array(Transaction)),
-        logs: option(array(Log)),
-        traces: option(array(Trace)),
-        stateDiffs: option(array(StateDiff)),
+        transactions: withDefault([], array(Transaction)),
+        logs: withDefault([], array(Log)),
+        traces: withDefault([], array(Trace)),
+        stateDiffs: withDefault([], array(StateDiff)),
     })
 })
 

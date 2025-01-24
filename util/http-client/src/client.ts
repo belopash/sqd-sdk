@@ -1,5 +1,4 @@
 import type {Logger} from '@subsquid/logger'
-import {createLogger} from '@subsquid/logger'
 import {addErrorContext, ensureError, wait} from '@subsquid/util-internal'
 import {HttpBody} from './body'
 import {addStreamTimeout} from '@subsquid/util-timeout'
@@ -21,6 +20,8 @@ export interface HttpClientOptions {
     bodyTimeout?: number
     retryAttempts?: number
     retrySchedule?: number[]
+    keepalive?: boolean
+
     log?: Logger | null
 }
 
@@ -34,6 +35,7 @@ export interface RequestOptions {
     bodyTimeout?: number
     abort?: AbortSignal
     stream?: boolean
+    keepalive?: boolean
 }
 
 
@@ -68,15 +70,17 @@ export class HttpClient {
     private httpTimeout: number
     private bodyTimeout?: number
     private requestCounter = 0
+    private keepalive?: boolean
 
     constructor(options: HttpClientOptions = {}) {
-        this.log = options.log === null ? undefined : options.log || createLogger('sqd:http-client')
+        this.log = options.log === null ? undefined : options.log
         this.headers = options.headers
         this.setBaseUrl(options.baseUrl)
         this.retrySchedule = options.retrySchedule || [10, 100, 500, 2000, 10000, 20000]
         this.retryAttempts = options.retryAttempts || 0
         this.httpTimeout = options.httpTimeout ?? 20000
         this.bodyTimeout = options.bodyTimeout
+        this.keepalive = options.keepalive
     }
 
     get<T=any>(url: string, options?: RequestOptions): Promise<T> {
@@ -141,7 +145,8 @@ export class HttpClient {
             let info: any = {
                 httpRequestId: req.id,
                 httpRequestUrl: req.url,
-                httpRequestMethod: req.method
+                httpRequestMethod: req.method,
+                httpRequestBody: req.body,
             }
             if (reason instanceof Error) {
                 info.reason = reason.toString()
@@ -196,6 +201,7 @@ export class HttpClient {
             timeout: options.httpTimeout ?? this.httpTimeout,
             bodyTimeout: options.bodyTimeout ?? this.bodyTimeout,
             stream: options.stream,
+            keepalive: options.keepalive ?? this.keepalive,
         }
 
         this.handleBasicAuth(req)
@@ -234,6 +240,9 @@ export class HttpClient {
                 req.headers.set(name, ''+this.headers[name])
             }
         }
+
+        // gzip is set by default
+        req.headers.set('accept-encoding', 'gzip')
 
         return req
     }

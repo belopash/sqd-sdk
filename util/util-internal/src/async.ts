@@ -1,6 +1,6 @@
-import assert from 'assert'
 import * as process from 'process'
-import {assertNotNull, ensureError} from './misc'
+import {assert, assertNotNull, ensureError} from './misc'
+
 
 
 export interface Future<T> {
