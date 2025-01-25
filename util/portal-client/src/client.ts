@@ -36,7 +36,7 @@ export interface PortalStreamOptions {
     stopOnHead?: boolean
 }
 
-export interface PortalStreamData<B> {
+export type PortalStreamData<B> = {
     finalizedHead: HashAndNumber
     blocks: B[]
 }

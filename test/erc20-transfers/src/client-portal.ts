@@ -50,7 +50,7 @@ async function main() {
         query,
     })
 
-    let from = await dataSource.getFinalizedHeight().then((h) => h - 1_000_000)
+    let from = await dataSource.getFinalizedHeight().then((h) => h - 100_000)
 
     for await (let {blocks, finalizedHead} of dataSource.getBlockStream({from}, true)) {
         console.log(

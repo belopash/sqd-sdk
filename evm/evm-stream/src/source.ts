@@ -1,6 +1,6 @@
-import {applyRangeBound, Range} from '@subsquid/util-internal-range'
+import {applyRangeBound, getRequestAt, Range} from '@subsquid/util-internal-range'
 import {PortalClient, PortalStreamData} from '@subsquid/portal-client'
-import {AsyncQueue, weakMemo} from '@subsquid/util-internal'
+import {weakMemo} from '@subsquid/util-internal'
 import {array, BYTES, cast, NAT, object, STRING, taggedUnion, withDefault} from '@subsquid/util-internal-validation'
 import {
     getBlockHeaderProps,
@@ -10,24 +10,29 @@ import {
     getTraceFrameValidator,
     project,
 } from './mapping/schema'
-import {BlockData, EvmQueryOptions, FieldSelection} from './query'
-import {Bytes} from '@subsquid/util-types'
+import {BlockData, EvmQueryOptions, EvmResponse, FieldSelection} from './query'
+import {Bytes, Simplify} from '@subsquid/util-types'
 
 export interface HashAndNumber {
     hash: Bytes
     number: number
 }
 
-export interface StreamData<B> {
+export type DataSourceStreamData<B> = {
     finalizedHead: HashAndNumber
-    rollbackHeads: HashAndNumber[]
-    blocks: B[]
+    blocks: (B & {[DataSource.blockRef]: HashAndNumber})[]
+}
+
+export type DataSourceStream<B> = ReadableStream<DataSourceStreamData<B>>
+
+export class DataSource<B> {
+    static readonly blockRef = Symbol('block ref')
 }
 
 export interface DataSource<B> {
     getHeight(): Promise<number>
     getFinalizedHeight(): Promise<number>
-    getBlockStream(range?: Range): ReadableStream<B>
+    getBlockStream(range?: Range): DataSourceStream<B>
 }
 
 export type GetDataSourceBlock<T> = T extends DataSource<infer B> ? B : never
@@ -38,7 +43,7 @@ export interface EvmPortalDataSourceOptions<F extends FieldSelection> {
 }
 
 export class EvmPortalDataSource<F extends FieldSelection, B extends BlockData<F> = BlockData<F>>
-    implements DataSource<StreamData<B>>
+    implements DataSource<B>
 {
     private portal: PortalClient
     private query: EvmQueryOptions<F>
@@ -56,75 +61,47 @@ export class EvmPortalDataSource<F extends FieldSelection, B extends BlockData<F
         return this.portal.getFinalizedHeight()
     }
 
-    getBlockStream(range?: Range, stopOnHead?: boolean): ReadableStream<StreamData<B>> {
-        let queue = new AsyncQueue<StreamData<B>>(1)
-        let ac = new AbortController()
+    getBlockStream(range?: Range, stopOnHead?: boolean): DataSourceStream<B> {
+        let requests = applyRangeBound(this.query.requests, range)
+        let fields = getFields(this.query.fields)
+
+        let {writable, readable} = new TransformStream<PortalStreamData<EvmResponse<any>>, DataSourceStreamData<B>>({
+            transform: (data, controller) => {
+                controller.enqueue({
+                    finalizedHead: data.finalizedHead,
+                    blocks: data.blocks.map((b) => {
+                        let block = mapBlock(b, fields) as unknown as B & {[DataSource.blockRef]: HashAndNumber}
+                        block[DataSource.blockRef] = {hash: b.header.hash, number: b.header.number}
+                        return block
+                    }),
+                })
+            },
+        })
 
         const ingest = async () => {
-            let requests = applyRangeBound(this.query.requests, range)
-            let fields = getFields(this.query.fields)
-
-            function abort() {
-                reader?.cancel()
-            }
-
-            ac.signal.addEventListener('abort', abort)
-
-            let reader: ReadableStreamDefaultReader<PortalStreamData<any>> | undefined
-            try {
-                for (let request of requests) {
-                    let query = {
-                        type: 'evm',
-                        fromBlock: request.range.from,
-                        toBlock: request.range.to,
-                        fields,
-                        ...request.request,
-                    }
-
-                    reader = this.portal.getFinalizedStream(query, {stopOnHead}).getReader()
-
-                    while (true) {
-                        let data = await reader.read()
-                        if (data.done) break
-
-                        let blocks = data.value.blocks.map((b) => mapBlock(b, fields) as unknown as B)
-
-                        await queue.put({
-                            finalizedHead: data.value.finalizedHead,
-                            blocks,
-                            rollbackHeads: [],
-                        })
-                    }
+            for (let request of requests) {
+                let query = {
+                    type: 'evm',
+                    fromBlock: request.range.from,
+                    toBlock: request.range.to,
+                    fields,
+                    ...request.request,
                 }
-            } finally {
-                reader?.cancel().catch(() => {})
+
+                await this.portal.getFinalizedStream(query, {stopOnHead}).pipeTo(writable, {
+                    preventClose: true,
+                })
             }
         }
 
-        return new ReadableStream({
-            start(controller) {
-                ingest()
-                    .then(() => {
-                        queue.close()
-                    })
-                    .catch((error) => {
-                        if (queue.isClosed()) return
-                        queue.close()
-                        controller.error(error)
-                    })
-            },
-            async pull(controller) {
-                let value = await queue.take()
-                if (value) {
-                    controller.enqueue(value)
-                } else {
-                    controller.close()
-                }
-            },
-            cancel() {
-                ac.abort()
-            },
-        })
+        ingest()
+            .then(
+                () => writable.close(),
+                (reason) => writable.abort(reason)
+            )
+            .catch(() => {})
+
+        return readable
     }
 }
 

@@ -119,7 +119,7 @@ export class ERC20DataSource<F extends Erc20FieldSelection> {
     getBlockStream(range?: Range, stopOnHead?: boolean): ReadableStream<any> {
         return this.ds.getBlockStream(range, stopOnHead).pipeThrough(
             new TransformStream({
-                transform: ({finalizedHead, blocks, rollbackHeads}, controller) => {
+                transform: ({blocks}, controller) => {
                     let request = getRequestAt(this.query.requests, (blocks[0].header as any).number)
                     let isLogsRequested =
                         !!request?.logs?.length ||
@@ -127,10 +127,8 @@ export class ERC20DataSource<F extends Erc20FieldSelection> {
                         !!request?.traces?.some((t) => t.transactionLogs) ||
                         !!request?.transfers?.some((t) => t.transactionLogs || t.log)
 
-                    controller.enqueue({
-                        finalizedHead,
-                        rollbackHeads,
-                        blocks: blocks.map((b) => ({
+                    controller.enqueue(
+                        blocks.map((b) => ({
                             ...b,
                             logs: isLogsRequested ? b.logs : undefined,
                             transfers: !!request?.transfers?.length
@@ -154,8 +152,8 @@ export class ERC20DataSource<F extends Erc20FieldSelection> {
                                       return transfer
                                   })
                                 : undefined,
-                        })),
-                    })
+                        }))
+                    )
                 },
             })
         )
