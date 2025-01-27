@@ -55,7 +55,7 @@ async function main() {
     for await (let {blocks, finalizedHead} of dataSource.getBlockStream({from}, true)) {
         console.log(
             `[${new Date().toISOString()}] progress: ${blocks[blocks.length - 1].header.number} / ${
-                finalizedHead.number
+                finalizedHead?.number ?? -1
             }` + `, blocks: ${blocks.length}`
         )
     }

@@ -19,7 +19,7 @@ export interface HashAndNumber {
 }
 
 export type DataSourceStreamData<B> = {
-    finalizedHead: HashAndNumber
+    finalizedHead?: HashAndNumber
     blocks: (B & {[DataSource.blockRef]: HashAndNumber})[]
 }
 
