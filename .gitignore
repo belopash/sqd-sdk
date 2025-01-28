@@ -23,3 +23,5 @@ common/autoinstallers/*/.npmrc
 
 # Built js libs
 /*/*/lib
+
+.turbo

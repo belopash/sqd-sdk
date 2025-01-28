@@ -1,5 +1,4 @@
 import {toHex} from "@subsquid/util-internal-hex"
-import {toJSON} from '@subsquid/util-internal-json'
 import assert from "assert"
 import {stderr as stderrColor} from "supports-color"
 import {LogLevel} from "../level"
@@ -84,7 +83,7 @@ export class Printer {
                 } else {
                     let text
                     try {
-                        text = JSON.stringify(toJSON(val))
+                        text = JSON.stringify(val, (_, v) => typeof v === 'bigint' ? v.toString() : v)
                     } catch(e: any) {
                         text = this.style('\u001b[31m', `failed to serialize logged value: ${e}`)
                     }

@@ -1,4 +1,3 @@
-import {toJSON} from "@subsquid/util-internal-json"
 import {LogLevel} from "../level"
 import {LogRecord} from "../logger"
 
@@ -10,12 +9,11 @@ export function jsonLinesStderrSink(rec: LogRecord): void {
 
 function stringify(rec: LogRecord): string {
     try {
-        let json = toJSON(rec)
-        let label = LABELS?.[json.level]
+        let label = LABELS?.[rec.level]
         if (label) {
-            json.level = label
+            rec.level = label as any
         }
-        return JSON.stringify(json)
+        return JSON.stringify(rec, (_, v) => typeof v === 'bigint' ? v.toString() : v)
     } catch(e: any) {
         return stringify({
             ns: 'sys',

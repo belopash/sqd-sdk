@@ -1,4 +1,3 @@
-import {toJSON} from '@subsquid/util-internal-json'
 import {LEVELS, LogLevel} from './level'
 
 
@@ -57,7 +56,7 @@ export class Logger {
         if (attributes instanceof Error) {
             attributes = {err: attributes}
         } else if (attributes instanceof Map || attributes instanceof Set) {
-            attributes = toJSON(attributes)
+            attributes = attributes
         }
         let rec: any = {
             level,
