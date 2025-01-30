@@ -23,6 +23,7 @@ export interface HttpClientOptions {
     keepalive?: boolean
 
     log?: Logger | null
+    fetch?: (input: RequestInfo, init?: RequestInit) => Promise<Response>
 }
 
 
@@ -71,6 +72,7 @@ export class HttpClient {
     private bodyTimeout?: number
     private requestCounter = 0
     private keepalive?: boolean
+    private fetch: (input: RequestInfo, init?: RequestInit) => Promise<Response>
 
     constructor(options: HttpClientOptions = {}) {
         this.log = options.log === null ? undefined : options.log
@@ -81,6 +83,7 @@ export class HttpClient {
         this.httpTimeout = options.httpTimeout ?? 20000
         this.bodyTimeout = options.bodyTimeout
         this.keepalive = options.keepalive
+        this.fetch = options.fetch || fetch
     }
 
     get<T=any>(url: string, options?: RequestOptions): Promise<T> {
@@ -299,7 +302,7 @@ export class HttpClient {
     }
 
     private async performRequest(req: FetchRequest): Promise<HttpResponse> {
-        let res = await fetch(req.url, req)
+        let res = await this.fetch(req.url, req)
         this.afterResponseHeaders(req, res.url, res.status, res.headers)
         let body = await this.handleResponseBody(req, res)
         let httpResponse = new HttpResponse(req.id, res.url, res.status, res.headers, body, body instanceof ReadableStream)
