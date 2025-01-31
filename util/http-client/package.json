@@ -23,7 +23,6 @@
     "@subsquid/util-timeout": "~2.3.2"
   },
   "devDependencies": {
-    "@types/node": "^18.18.14",
     "typescript": "~5.5.4"
   }
 }

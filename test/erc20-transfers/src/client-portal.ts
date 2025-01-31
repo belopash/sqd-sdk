@@ -2,6 +2,7 @@ import {PortalClient} from '@subsquid/portal-client'
 import {HttpClient} from '@subsquid/http-client'
 import {EvmPortalDataSource} from '@subsquid/evm-stream'
 import {EvmQueryBuilder} from '@subsquid/evm-stream/lib/query'
+import {Readable} from 'stream'
 
 async function main() {
     let portal = new PortalClient({
@@ -9,6 +10,14 @@ async function main() {
         http: new HttpClient({
             retryAttempts: Infinity,
             keepalive: true,
+            async fetch(input, init) {
+                let res = await fetch(input, init)
+                if (res.body instanceof Readable) {
+                    res = new Response(Readable.toWeb(res.body) as ReadableStream, res)
+                }
+
+                return res
+            },
         }),
     })
 

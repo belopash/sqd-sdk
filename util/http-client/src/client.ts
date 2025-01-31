@@ -224,10 +224,8 @@ export class HttpClient {
                 if (!req.headers.has('content-type')) {
                     req.headers.set('content-type', 'text/plain')
                 }
-            } else if (Buffer.isBuffer(options.content)) {
-                req.body = options.content
             } else {
-                req.body = Buffer.from(options.content.buffer, options.content.byteOffset, options.content.byteLength)
+                req.body = options.content
             }
         }
 
@@ -289,14 +287,6 @@ export class HttpClient {
             if (timer != null) {
                 clearTimeout(timer)
             }
-            // FIXME:
-            // if (req.signal && res?.stream) {
-            //     // FIXME: is `close` always emitted?
-            //     (res.body as NodeJS.ReadableStream).on('close', () => {
-            //         req.signal!.removeEventListener('abort', abort)
-            //     })
-            // } else {
-            // }
             req.signal?.removeEventListener('abort', abort)
         }
     }
@@ -332,7 +322,7 @@ export class HttpClient {
 
         let arrayBuffer = await res.arrayBuffer()
         if (arrayBuffer.byteLength == 0) return undefined
-        return Buffer.from(arrayBuffer)
+        return arrayBuffer
     }
 
     isRetryableError(error: HttpResponse | Error, req?: FetchRequest): boolean {

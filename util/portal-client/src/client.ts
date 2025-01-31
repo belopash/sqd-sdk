@@ -82,7 +82,7 @@ export class PortalClient {
     ): Promise<R[]> {
         // FIXME: is it needed or it is better to always use stream?
         return this.client
-            .request<Buffer>('POST', this.getDatasetUrl(`finalized-stream`), {
+            .request<ArrayBuffer>('POST', this.getDatasetUrl(`finalized-stream`), {
                 ...options,
                 json: query,
             })
@@ -92,8 +92,7 @@ export class PortalClient {
                 })
             )
             .then((res) => {
-                let blocks = res.body
-                    .toString('utf8')
+                let blocks = new TextDecoder('utf-8').decode(res.body)
                     .trimEnd()
                     .split('\n')
                     .map((line) => JSON.parse(line))
@@ -136,7 +135,7 @@ export class PortalClient {
                 }
 
                 let res = await this.client
-                    .request<ReadableStream<Buffer>>('POST', this.getDatasetUrl('finalized-stream'), {
+                    .request<ReadableStream>('POST', this.getDatasetUrl('finalized-stream'), {
                         ...o,
                         json: q,
                         stream: true,
