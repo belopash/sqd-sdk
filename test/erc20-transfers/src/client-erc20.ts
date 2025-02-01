@@ -1,4 +1,5 @@
 import {PortalClient} from '@subsquid/portal-client'
+import {EvmFinalizedQuery} from '@subsquid/portal-client/lib/query/evm'
 import {HttpClient} from '@subsquid/http-client'
 
 async function main() {
@@ -14,22 +15,14 @@ async function main() {
     // all SQD transfers
     let stream = portal.getFinalizedStream(
         {
-            type: 'erc20',
+            type: 'evm',
             fromBlock,
-            transfers: [{address: ['0x1337420ded5adb9980cfc35f8f2b054ea86f8ab1']}],
             fields: {
                 block: {
                     timestamp: true,
                 },
-                transfer: {
-                    address: true,
-                    from: true,
-                    to: true,
-                    value: true,
-                    transactionHash: true,
-                },
             },
-        },
+        } satisfies EvmFinalizedQuery,
         {
             stopOnHead: true,
         }

@@ -1,6 +1,14 @@
 import {HttpClient} from '@subsquid/http-client'
-import {createFuture, Future, Throttler, unexpectedCase, wait, withErrorContext} from '@subsquid/util-internal'
-import {HashAndNumber, PortalQuery, PortalResponse} from './query'
+import {
+    createFuture,
+    Future,
+    Simplify,
+    Throttler,
+    unexpectedCase,
+    wait,
+    withErrorContext,
+} from '@subsquid/util-internal'
+import {EvmFinalizedQuery, EvmResponse} from './query/evm'
 
 export interface PortalClientOptions {
     url: string
@@ -40,6 +48,27 @@ export type PortalStreamData<B> = {
     finalizedHead?: HashAndNumber
     blocks: B[]
 }
+
+export type BaseQuery = {
+    type: string & {}
+    fromBlock?: number
+    toBlock?: number
+}
+
+export type PortalQuery = BaseQuery | EvmFinalizedQuery
+
+export type HashAndNumber = {
+    hash: string
+    number: number
+}
+
+export type BaseResponse = {}
+
+export type PortalResponse<Q extends PortalQuery> = Simplify<
+    (Q extends EvmFinalizedQuery ? EvmResponse<Q> : BaseResponse) & {
+        header: HashAndNumber
+    }
+>
 
 export class PortalClient {
     private url: URL
@@ -92,7 +121,8 @@ export class PortalClient {
                 })
             )
             .then((res) => {
-                let blocks = new TextDecoder('utf-8').decode(res.body)
+                let blocks = new TextDecoder('utf-8')
+                    .decode(res.body)
                     .trimEnd()
                     .split('\n')
                     .map((line) => JSON.parse(line))
