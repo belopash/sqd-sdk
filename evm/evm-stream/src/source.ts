@@ -10,7 +10,7 @@ import {
     getTraceFrameValidator,
     project,
 } from './mapping/schema'
-import {BlockData, EvmQueryOptions, EvmResponse, FieldSelection} from './query'
+import {BlockData, EvmQueryOptions, FieldSelection, Response} from './query'
 import {Bytes, Simplify} from '@subsquid/util-types'
 
 export interface HashAndNumber {
@@ -65,7 +65,7 @@ export class EvmPortalDataSource<F extends FieldSelection, B extends BlockData<F
         let requests = applyRangeBound(this.query.requests, range)
         let fields = getFields(this.query.fields)
 
-        let {writable, readable} = new TransformStream<PortalStreamData<EvmResponse<any>>, DataSourceStreamData<B>>({
+        let {writable, readable} = new TransformStream<PortalStreamData<Response<any>>, DataSourceStreamData<B>>({
             transform: (data, controller) => {
                 controller.enqueue({
                     finalizedHead: data.finalizedHead,

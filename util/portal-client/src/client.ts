@@ -1,6 +1,13 @@
 import {HttpClient} from '@subsquid/http-client'
-import {createFuture, Future, Throttler, unexpectedCase, wait, withErrorContext} from '@subsquid/util-internal'
-import {HashAndNumber, PortalQuery, PortalResponse} from './query'
+import {
+    createFuture,
+    Future,
+    Simplify,
+    Throttler,
+    unexpectedCase,
+    wait,
+    withErrorContext,
+} from '@subsquid/util-internal'
 
 export interface PortalClientOptions {
     url: string
@@ -41,6 +48,21 @@ export type PortalStreamData<B> = {
     blocks: B[]
 }
 
+export type PortalQuery = {
+    type: string & {}
+    fromBlock?: number
+    toBlock?: number
+}
+
+export type HashAndNumber = {
+    hash: string
+    number: number
+}
+
+export type PortalResponse = {
+    header: HashAndNumber
+}
+
 export class PortalClient {
     private url: URL
     private client: HttpClient
@@ -76,7 +98,7 @@ export class PortalClient {
         return height
     }
 
-    getFinalizedQuery<Q extends PortalQuery = PortalQuery, R extends PortalResponse<Q> = PortalResponse<Q>>(
+    getFinalizedQuery<Q extends PortalQuery = PortalQuery, R extends PortalResponse = PortalResponse>(
         query: Q,
         options?: PortalRequestOptions
     ): Promise<R[]> {
@@ -92,8 +114,8 @@ export class PortalClient {
                 })
             )
             .then((res) => {
-                let blocks = res.body
-                    .toString('utf8')
+                let blocks = new TextDecoder('utf-8')
+                    .decode(res.body)
                     .trimEnd()
                     .split('\n')
                     .map((line) => JSON.parse(line))
@@ -101,7 +123,7 @@ export class PortalClient {
             })
     }
 
-    getFinalizedStream<Q extends PortalQuery = PortalQuery, R extends PortalResponse<Q> = PortalResponse<Q>>(
+    getFinalizedStream<Q extends PortalQuery = PortalQuery, R extends PortalResponse = PortalResponse>(
         query: Q,
         options?: PortalStreamOptions
     ): ReadableStream<PortalStreamData<R>> {
@@ -165,10 +187,7 @@ export class PortalClient {
     }
 }
 
-function createReadablePortalStream<
-    Q extends PortalQuery = PortalQuery,
-    B extends PortalResponse<Q> = PortalResponse<Q>
->(
+function createReadablePortalStream<Q extends PortalQuery = PortalQuery, B extends PortalResponse = PortalResponse>(
     query: Q,
     options: Required<PortalStreamOptions>,
     requestStream: (

@@ -1,2 +1,3 @@
 export * from './client'
-export * from './query'
+export type * as Evm from './query/evm'
+export type * as Substrate from './query/substrate'

@@ -1,12 +1,13 @@
+import {applyRangeBound, mergeRangeRequests, Range, RangeRequest} from '@subsquid/util-internal-range'
+
 import {
     DataRequest,
-    FieldSelection,
     LogRequest,
-    StateDiffRequest,
-    TraceRequest,
     TransactionRequest,
+    TraceRequest,
+    StateDiffRequest,
+    FieldSelection,
 } from '@subsquid/portal-client/lib/query/evm'
-import {applyRangeBound, mergeRangeRequests, Range, RangeRequest} from '@subsquid/util-internal-range'
 
 export * from '@subsquid/portal-client/lib/query/evm'
 

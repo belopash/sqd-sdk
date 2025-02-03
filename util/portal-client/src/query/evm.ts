@@ -181,12 +181,7 @@ export type StateDiffDeleteFields = StateDiffBaseFields & {
 
 type Trues<T> = {[K in keyof T]-?: true}
 
-export type BlockHeaderFieldSelection = Simplify<
-    Selector<keyof BlockHeaderFields> & {
-        hash: true
-        number: true
-    }
->
+export type BlockHeaderFieldSelection = Simplify<Selector<keyof BlockHeaderFields>>
 export type BlockHeader<T extends BlockHeaderFieldSelection = Trues<BlockHeaderFieldSelection>> = Simplify<
     Select<BlockHeaderFields, T>
 >
@@ -334,7 +329,7 @@ export type DataRequest = {
     includeAllBlocks?: boolean
 }
 
-export type EvmQuery = Simplify<
+export type FinalizedQuery = Simplify<
     {
         type: 'evm'
         fromBlock?: number
@@ -351,4 +346,4 @@ export type BlockData<F extends FieldSelection> = Simplify<{
     stateDiffs?: StateDiff<ExcludeUndefined<F['stateDiff']>>[]
 }>
 
-export type EvmResponse<Q extends EvmQuery> = BlockData<Q['fields']>
+export type Response<Q extends FinalizedQuery> = BlockData<Q['fields']>
